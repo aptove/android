@@ -1,0 +1,52 @@
+<resources>
+    <string name="app_name">ACP Chat</string>
+    
+    <!-- Agent List Screen -->
+    <string name="agents_title">Agents</string>
+    <string name="add_agent">Add Agent</string>
+    <string name="no_agents">No agents connected</string>
+    <string name="scan_qr_to_add">Scan a QR code to add your first agent</string>
+    <string name="agent_connected">Connected</string>
+    <string name="agent_disconnected">Disconnected</string>
+    <string name="agent_reconnecting">Reconnecting…</string>
+    
+    <!-- QR Scanner Screen -->
+    <string name="qr_scanner_title">Scan QR Code</string>
+    <string name="qr_scanner_instructions">Point camera at agent QR code</string>
+    <string name="qr_scanner_flashlight">Toggle Flashlight</string>
+    <string name="qr_scanner_cancel">Cancel</string>
+    <string name="qr_scanner_manual_entry">Enter Manually</string>
+    
+    <!-- Chat Screen -->
+    <string name="chat_title">Chat</string>
+    <string name="message_hint">Type a message…</string>
+    <string name="send_message">Send</string>
+    <string name="message_sending">Sending…</string>
+    <string name="message_sent">Sent</string>
+    <string name="message_error">Failed to send</string>
+    
+    <!-- Agent Details Screen -->
+    <string name="agent_details_title">Agent Details</string>
+    <string name="agent_name">Name</string>
+    <string name="agent_url">URL</string>
+    <string name="agent_protocol">Protocol</string>
+    <string name="agent_capabilities">Capabilities</string>
+    <string name="agent_disconnect">Disconnect Agent</string>
+    <string name="agent_disconnect_confirm">Are you sure you want to disconnect from this agent? All conversation history will be deleted.</string>
+    <string name="cancel">Cancel</string>
+    <string name="disconnect">Disconnect</string>
+    
+    <!-- Errors -->
+    <string name="error_camera_permission">Camera permission is required to scan QR codes</string>
+    <string name="error_invalid_qr">Invalid QR code format</string>
+    <string name="error_connection_failed">Failed to connect to agent</string>
+    <string name="error_no_internet">No internet connection</string>
+    <string name="error_agent_not_responding">Agent is not responding</string>
+    <string name="error_timeout">Connection timeout</string>
+    <string name="error_generic">An error occurred. Please try again.</string>
+    
+    <!-- Notifications -->
+    <string name="notification_channel_name">Agent Connections</string>
+    <string name="notification_channel_description">Notifications for active agent connections</string>
+    <string name="notification_active_connections">%1$d active agent connection(s)</string>
+</resources>

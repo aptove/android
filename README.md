@@ -1,0 +1,194 @@
+# ACP Chat - Android
+
+A mobile chat application for Android that enables users to connect with AI agents using the Agent Client Protocol (ACP).
+
+## Features
+
+- **QR Code Agent Connection** - Scan QR codes to connect to AI agents
+- **Agent Management** - Manage multiple agent connections
+- **Real-time Chat** - Send and receive messages with AI agents
+- **Message Streaming** - Display agent responses as they stream in
+- **Secure Credentials** - Android Keystore encryption for connection credentials
+- **Message Persistence** - Room database for offline message storage
+- **Material Design 3** - Modern UI with Jetpack Compose
+- **Lifecycle Aware** - Handles Android lifecycle events properly
+- **Full ACP Protocol** - Integrated with official ACP Kotlin SDK
+
+## Requirements
+
+- Android 8.0 (API 26) or later
+- Kotlin 2.0+
+- Android Studio Hedgehog or later
+
+## Architecture
+
+The app follows Clean Architecture principles with MVVM pattern:
+
+```
+app/
+├── data/
+│   ├── model/          # Data models (Agent, Message, ConnectionConfig)
+│   ├── local/          # Room database, DAOs, CredentialStorage
+│   └── repository/     # Repository implementations
+├── domain/
+│   ├── acp/            # ACP client wrapper using official SDK
+│   └── usecase/        # Business logic use cases
+├── ui/
+│   ├── agents/         # Agent list screen
+│   ├── chat/           # Chat screen
+│   ├── qr/             # QR scanner screen
+│   └── theme/          # Material Theme
+├── di/                 # Hilt dependency injection modules
+└── service/            # Background services
+```
+
+## Technology Stack
+
+- **UI**: Jetpack Compose + Material 3
+- **Architecture**: MVVM + Clean Architecture
+- **DI**: Hilt
+- **Database**: Room
+- **Security**: Android Keystore + EncryptedSharedPreferences
+- **Networking**: ACP Kotlin SDK with Ktor WebSockets
+- **Serialization**: kotlinx.serialization
+- **Navigation**: Jetpack Navigation Compose
+- **QR Scanning**: ZXing + CameraX
+
+## Building
+
+### Prerequisites
+
+1. Install Android Studio
+2. Clone the repository
+3. Open the `chat-ai/android` directory in Android Studio
+
+### ACP SDK Integration
+
+The app uses the ACP Kotlin SDK via Gradle composite build:
+
+```gradle
+// settings.gradle.kts
+includeBuild("../../../kotlin-sdk-repo") {
+    dependencySubstitution {
+        substitute(module("com.agentclientprotocol:acp-model")).using(project(":acp-model"))
+        substitute(module("com.agentclientprotocol:acp")).using(project(":acp"))
+        substitute(module("com.agentclientprotocol:acp-ktor-client")).using(project(":acp-ktor-client"))
+    }
+}
+```
+
+### Build Commands
+
+```bash
+# Build debug APK
+./gradlew assembleDebug
+
+# Build release APK
+./gradlew assembleRelease
+
+# Run tests
+./gradlew test
+
+# Run on connected device
+./gradlew installDebug
+```
+
+## Configuration
+
+The app connects to ACP agents using QR codes with the following format:
+
+```json
+{
+  "url": "https://agent.yourdomain.com",
+  "clientId": "xxxxx.access",
+  "clientSecret": "xxxxxxxxxxxxxx",
+  "protocol": "acp",
+  "version": "1.0"
+}
+```
+
+## Security
+
+- **Credential Storage**: Uses Android Keystore with AES-256-GCM encryption
+- **Network Security**: HTTPS/WSS only (no cleartext traffic)
+- **Certificate Pinning**: Recommended for production (not implemented in demo)
+- **Biometric Auth**: Can be enabled for credential access
+
+## ACP Protocol Implementation
+
+The app uses the official ACP Kotlin SDK:
+
+```kotlin
+// Connect to agent via WebSocket
+val protocol = httpClient.acpProtocolOnClientWebSocket(
+    url = config.toWebSocketUrl(),
+    protocolOptions = ProtocolOptions()
+) {
+    headers.append("CF-Access-Client-Id", config.clientId)
+    headers.append("CF-Access-Client-Secret", config.clientSecret)
+}
+
+// Create client
+val client = Client(protocol)
+protocol.start()
+
+// Initialize handshake
+val serverInfo = client.initialize(
+    ClientInfo(
+        name = "ACP Chat Android",
+        version = "1.0.0",
+        capabilities = ClientCapabilities()
+    )
+)
+
+// Create session
+val sessionId = client.newSession(SessionCreationParameters())
+
+// Send message and collect streaming response
+client.prompt(sessionId, message)
+    .collect { event ->
+        when (event) {
+            is Event.SessionUpdate -> handleUpdate(event.update)
+            is Event.PromptResponse -> handleComplete()
+        }
+    }
+```
+
+## Testing
+
+Run unit tests:
+```bash
+./gradlew test
+```
+
+Run instrumented tests:
+```bash
+./gradlew connectedAndroidTest
+```
+
+## Known Limitations
+
+1. **QR Scanner**: The QR scanner screen includes a demo button for testing. Production implementation would use CameraX + ZXing for actual QR code scanning.
+
+2. **Background Sync**: Messages are not synced in background. App must be active for real-time communication.
+
+3. **Single Agent Connection**: Currently supports one active connection at a time.
+
+## Future Enhancements
+
+- [ ] Actual camera-based QR scanning
+- [ ] Push notifications for messages
+- [ ] File attachments support
+- [ ] Voice input
+- [ ] Session management (fork, resume)
+- [ ] Multi-device sync
+- [ ] End-to-end encryption
+- [ ] Multiple concurrent agent connections
+
+## License
+
+See LICENSE file in the repository root.
+
+## Contributing
+
+This is a reference implementation. Contributions welcome via pull requests.
