@@ -4,6 +4,7 @@ import androidx.room.TypeConverter
 import com.acp.chat.data.model.ConnectionStatus
 import com.acp.chat.data.model.MessageSender
 import com.acp.chat.data.model.MessageStatus
+import com.acp.chat.data.model.MessageType
 
 class Converters {
     @TypeConverter
@@ -23,4 +24,10 @@ class Converters {
 
     @TypeConverter
     fun toMessageStatus(value: String): MessageStatus = MessageStatus.valueOf(value)
+    
+    @TypeConverter
+    fun fromMessageType(value: MessageType): String = value.name
+    
+    @TypeConverter
+    fun toMessageType(value: String): MessageType = MessageType.valueOf(value)
 }

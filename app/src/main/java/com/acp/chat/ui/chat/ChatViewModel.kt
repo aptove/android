@@ -5,6 +5,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.acp.chat.data.model.Agent
 import com.acp.chat.data.model.Message
+import com.acp.chat.data.model.MessageSender
+import com.acp.chat.data.model.MessageStatus
+import com.acp.chat.data.model.MessageType
 import com.acp.chat.data.repository.AgentRepository
 import com.acp.chat.data.repository.MessageRepository
 import com.acp.chat.domain.usecase.SendMessageUseCase
@@ -40,6 +43,7 @@ class ChatViewModel @Inject constructor(
         loadAgent()
         loadMessages()
         connectToAgent()
+        setupToolApprovalHandler()
     }
 
     private fun loadAgent() {
@@ -60,6 +64,30 @@ class ChatViewModel @Inject constructor(
                 .collect { messages ->
                     _uiState.update { it.copy(messages = messages) }
                 }
+        }
+    }
+    
+    private fun setupToolApprovalHandler() {
+        viewModelScope.launch {
+            // Get ACPClient from repository to set up approval handler
+            val acpClient = agentRepository.getACPClient()
+            acpClient.onToolApprovalRequest = { toolCallId, title, command ->
+                viewModelScope.launch {
+                    val commandText = command?.let { "\n\n`$it`" } ?: ""
+                    val approvalMessage = Message(
+                        agentId = agentId,
+                        text = "⚠️ **Permission Required**\n\n$title$commandText",
+                        sender = MessageSender.AGENT,
+                        status = MessageStatus.SENT,
+                        type = MessageType.TOOL_APPROVAL_REQUEST,
+                        toolCallId = toolCallId,
+                        toolTitle = title,
+                        toolCommand = command,
+                        toolApproved = null
+                    )
+                    messageRepository.insertMessage(approvalMessage)
+                }
+            }
         }
     }
 
@@ -112,6 +140,36 @@ class ChatViewModel @Inject constructor(
 
     fun clearError() {
         _uiState.update { it.copy(error = null) }
+    }
+    
+    fun approveTool(messageId: String) {
+        viewModelScope.launch {
+            val message = _uiState.value.messages.find { it.id == messageId }
+            val toolCallId = message?.toolCallId ?: return@launch
+            
+            // Update message in DB with approved status
+            val updatedMessage = message.copy(toolApproved = true)
+            messageRepository.insertMessage(updatedMessage)
+            
+            // Resume the continuation in ACPClient
+            val acpClient = agentRepository.getACPClient()
+            acpClient.approveTool(toolCallId)
+        }
+    }
+    
+    fun rejectTool(messageId: String) {
+        viewModelScope.launch {
+            val message = _uiState.value.messages.find { it.id == messageId }
+            val toolCallId = message?.toolCallId ?: return@launch
+            
+            // Update message in DB with rejected status
+            val updatedMessage = message.copy(toolApproved = false)
+            messageRepository.insertMessage(updatedMessage)
+            
+            // Resume the continuation in ACPClient with cancellation
+            val acpClient = agentRepository.getACPClient()
+            acpClient.rejectTool(toolCallId)
+        }
     }
 
     override fun onCleared() {

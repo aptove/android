@@ -95,4 +95,8 @@ class AgentRepository @Inject constructor(
     fun getSession(agentId: String): ClientSession? {
         return sessionCache[agentId]
     }
+    
+    fun getACPClient(): ACPClient {
+        return acpClient
+    }
 }

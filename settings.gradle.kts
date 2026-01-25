@@ -20,7 +20,7 @@ plugins {
 }
 
 // Include Kotlin SDK as composite build
-includeBuild("../../kotlin-sdk-repo") {
+includeBuild("../kotlin-sdk") {
     dependencySubstitution {
         substitute(module("com.agentclientprotocol:acp-model")).using(project(":acp-model"))
         substitute(module("com.agentclientprotocol:acp")).using(project(":acp"))

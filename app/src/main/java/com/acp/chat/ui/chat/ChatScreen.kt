@@ -9,6 +9,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -20,6 +22,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.acp.chat.R
 import com.acp.chat.data.model.Message
 import com.acp.chat.data.model.MessageSender
+import com.acp.chat.data.model.MessageType
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
@@ -72,7 +75,10 @@ fun ChatScreen(
             contentPadding = PaddingValues(vertical = 16.dp)
         ) {
             items(uiState.messages, key = { it.id }) { message ->
-                MessageBubble(message = message)
+                MessageBubble(
+                    message = message,
+                    viewModel = viewModel
+                )
             }
 
             if (uiState.isSending) {
@@ -104,9 +110,101 @@ fun ChatScreen(
 }
 
 @Composable
-private fun MessageBubble(message: Message) {
+private fun MessageBubble(
+    message: Message,
+    viewModel: ChatViewModel
+) {
     val isUser = message.sender == MessageSender.USER
+    
+    // Tool approval message styling
+    if (message.type == MessageType.TOOL_APPROVAL_REQUEST) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp)
+        ) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.tertiaryContainer,
+                tonalElevation = 2.dp
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = message.text,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer
+                    )
+                    
+                    val toolApproval = message.toolApproval
+                    if (toolApproval != null) {
+                        // Show buttons if not yet decided
+                        if (toolApproval.approved == null) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Button(
+                                    onClick = { viewModel.approveTool(message.id) },
+                                    modifier = Modifier.weight(1f),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = Color(0xFF4CAF50)
+                                    )
+                                ) {
+                                    Icon(
+                                        Icons.Default.Check,
+                                        contentDescription = "Approve",
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Approve")
+                                }
+                                
+                                OutlinedButton(
+                                    onClick = { viewModel.rejectTool(message.id) },
+                                    modifier = Modifier.weight(1f),
+                                    colors = ButtonDefaults.outlinedButtonColors(
+                                        contentColor = Color(0xFFF44336)
+                                    )
+                                ) {
+                                    Icon(
+                                        Icons.Default.Close,
+                                        contentDescription = "Reject",
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Reject")
+                                }
+                            }
+                        } else {
+                            // Show approval status
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    if (toolApproval.approved) Icons.Default.Check else Icons.Default.Close,
+                                    contentDescription = null,
+                                    tint = if (toolApproval.approved) Color(0xFF4CAF50) else Color(0xFFF44336),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = if (toolApproval.approved) "Approved" else "Rejected",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = if (toolApproval.approved) Color(0xFF4CAF50) else Color(0xFFF44336)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return
+    }
 
+    // Regular text message
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start

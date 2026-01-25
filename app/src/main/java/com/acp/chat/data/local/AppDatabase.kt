@@ -8,7 +8,7 @@ import com.acp.chat.data.model.Message
 
 @Database(
     entities = [Agent::class, Message::class],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

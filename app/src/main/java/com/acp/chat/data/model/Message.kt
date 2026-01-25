@@ -17,6 +17,18 @@ enum class MessageStatus {
     TIMEOUT
 }
 
+enum class MessageType {
+    TEXT,
+    TOOL_APPROVAL_REQUEST
+}
+
+data class ToolApprovalInfo(
+    val toolCallId: String,
+    val title: String,
+    val command: String? = null,
+    val approved: Boolean? = null  // null=pending, true=approved, false=rejected
+)
+
 @Entity(tableName = "messages")
 data class Message(
     @PrimaryKey
@@ -26,5 +38,15 @@ data class Message(
     val sender: MessageSender,
     val status: MessageStatus = MessageStatus.SENT,
     val timestamp: Long = System.currentTimeMillis(),
-    val error: String? = null
-)
+    val error: String? = null,
+    val type: MessageType = MessageType.TEXT,
+    val toolCallId: String? = null,
+    val toolTitle: String? = null,
+    val toolCommand: String? = null,
+    val toolApproved: Boolean? = null
+) {
+    val toolApproval: ToolApprovalInfo?
+        get() = if (type == MessageType.TOOL_APPROVAL_REQUEST && toolCallId != null && toolTitle != null) {
+            ToolApprovalInfo(toolCallId, toolTitle, toolCommand, toolApproved)
+        } else null
+}

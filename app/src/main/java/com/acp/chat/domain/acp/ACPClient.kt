@@ -17,10 +17,18 @@ import io.ktor.client.engine.okhttp.*
 import io.ktor.client.plugins.websocket.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
+import kotlinx.serialization.json.JsonElement
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.pow
 import kotlin.time.Duration.Companion.seconds
+
+data class ToolApprovalRequest(
+    val toolCallId: String,
+    val toolCall: SessionUpdate.ToolCallUpdate,
+    val permissions: List<PermissionOption>
+)
 
 @Singleton
 class ACPClient @Inject constructor() {
@@ -38,6 +46,10 @@ class ACPClient @Inject constructor() {
     
     private val _connectionState = MutableStateFlow<ACPConnectionState>(ACPConnectionState.Disconnected)
     val connectionState: StateFlow<ACPConnectionState> = _connectionState.asStateFlow()
+    
+    // Tool approval management
+    private val pendingApprovals = mutableMapOf<String, CancellableContinuation<RequestPermissionResponse>>()
+    var onToolApprovalRequest: ((String, String, String?) -> Unit)? = null
 
     private var reconnectJob: Job? = null
     private var reconnectAttempt = 0
@@ -67,12 +79,15 @@ class ACPClient @Inject constructor() {
             // Start the protocol
             newProtocol.start()
 
-            // Initialize handshake
+            // Initialize handshake with terminal support
             val agentInfo = newClient.initialize(
                 ClientInfo(
                     implementation = Implementation(
                         name = "ACP Chat Android",
                         version = "1.0.0"
+                    ),
+                    capabilities = ClientCapabilities(
+                        terminal = true  // Enable terminal support
                     )
                 )
             )
@@ -120,22 +135,74 @@ class ACPClient @Inject constructor() {
         try {
             val currentClient = client ?: throw Exception("Not connected")
             
-            // Create operations factory - returns a ClientSessionOperations implementation
+            // Create operations factory with tool approval support
             val operationsFactory = ClientOperationsFactory { sessionId, sessionResponse ->
-                object : com.agentclientprotocol.common.ClientSessionOperations {
+                object : com.agentclientprotocol.common.ClientSessionOperations,
+                         com.agentclientprotocol.common.TerminalOperations {
+                    
                     override suspend fun requestPermissions(
                         toolCall: SessionUpdate.ToolCallUpdate,
                         permissions: List<PermissionOption>,
-                        _meta: kotlinx.serialization.json.JsonElement?
-                    ): RequestPermissionResponse {
-                        // For simple chat, cancel all permission requests
-                        return RequestPermissionResponse(
-                            outcome = RequestPermissionOutcome.Cancelled
-                        )
+                        _meta: JsonElement?
+                    ): RequestPermissionResponse = suspendCancellableCoroutine { continuation ->
+                        val requestId = toolCall.toolCallId.value
+                        pendingApprovals[requestId] = continuation
+                        
+                        // Notify UI on main thread
+                        scope.launch(Dispatchers.Main) {
+                            onToolApprovalRequest?.invoke(
+                                requestId,
+                                toolCall.title ?: "Tool Approval Required",
+                                null
+                            )
+                        }
                     }
                     
-                    override suspend fun notify(notification: SessionUpdate, _meta: kotlinx.serialization.json.JsonElement?) {
-                        // Handle notifications if needed - for now just log
+                    override suspend fun terminalCreate(
+                        command: String,
+                        args: List<String>,
+                        cwd: String?,
+                        env: List<EnvVariable>,
+                        outputByteLimit: ULong?,
+                        _meta: JsonElement?
+                    ): CreateTerminalResponse {
+                        val fullCommand = "$command ${args.joinToString(" ")}"
+                        
+                        // For now, approve terminal commands automatically
+                        // In a real implementation, this would wait for user approval
+                        return CreateTerminalResponse(java.util.UUID.randomUUID().toString())
+                    }
+                    
+                    override suspend fun terminalOutput(
+                        terminalId: String,
+                        _meta: JsonElement?
+                    ): TerminalOutputResponse {
+                        return TerminalOutputResponse("", truncated = false)
+                    }
+                    
+                    override suspend fun terminalRelease(
+                        terminalId: String,
+                        _meta: JsonElement?
+                    ): ReleaseTerminalResponse {
+                        return ReleaseTerminalResponse()
+                    }
+                    
+                    override suspend fun terminalWaitForExit(
+                        terminalId: String,
+                        _meta: JsonElement?
+                    ): WaitForTerminalExitResponse {
+                        return WaitForTerminalExitResponse(0u)
+                    }
+                    
+                    override suspend fun terminalKill(
+                        terminalId: String,
+                        _meta: JsonElement?
+                    ): KillTerminalCommandResponse {
+                        return KillTerminalCommandResponse()
+                    }
+                    
+                    override suspend fun notify(notification: SessionUpdate, _meta: JsonElement?) {
+                        // Handle notifications if needed
                     }
                 }
             }
@@ -194,8 +261,31 @@ class ACPClient @Inject constructor() {
             }
     }.flowOn(Dispatchers.IO)
 
+    fun approveTool(toolCallId: String) {
+        val continuation = pendingApprovals.remove(toolCallId)
+        continuation?.resume(
+            RequestPermissionResponse(
+                outcome = RequestPermissionOutcome.Selected(
+                    optionId = PermissionOptionId("approve")
+                )
+            )
+        ) {}
+    }
+    
+    fun rejectTool(toolCallId: String) {
+        val continuation = pendingApprovals.remove(toolCallId)
+        continuation?.resume(
+            RequestPermissionResponse(
+                outcome = RequestPermissionOutcome.Cancelled
+            )
+        ) {}
+    }
+
     suspend fun disconnect() {
         reconnectJob?.cancel()
+        // Cancel all pending approvals
+        pendingApprovals.values.forEach { it.cancel() }
+        pendingApprovals.clear()
         protocol?.close()
         protocol = null
         client = null
@@ -205,6 +295,8 @@ class ACPClient @Inject constructor() {
 
     fun cleanup() {
         reconnectJob?.cancel()
+        pendingApprovals.values.forEach { it.cancel() }
+        pendingApprovals.clear()
         scope.cancel()
         httpClient.close()
     }
