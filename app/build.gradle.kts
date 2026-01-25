@@ -52,6 +52,15 @@ android {
     buildFeatures {
         compose = true
     }
+    
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
+            isUniversalApk = true
+        }
+    }
 
     packaging {
         resources {
@@ -61,7 +70,6 @@ android {
         // Optimize native libraries for 16 KB page size support
         jniLibs {
             useLegacyPackaging = false
-            // Pick first occurrence of any duplicate libraries
             pickFirsts.add("**/*.so")
         }
     }
@@ -115,8 +123,8 @@ dependencies {
     implementation("com.google.zxing:core:3.5.3")
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")
 
-    // CameraX for Camera
-    val cameraxVersion = "1.3.1"
+    // CameraX for Camera - version 1.4.0+ has 16 KB page size support
+    val cameraxVersion = "1.4.0"
     implementation("androidx.camera:camera-camera2:$cameraxVersion")
     implementation("androidx.camera:camera-lifecycle:$cameraxVersion")
     implementation("androidx.camera:camera-view:$cameraxVersion")
