@@ -23,9 +23,14 @@ class ConnectAgentUseCase @Inject constructor(
             // Parse QR code data
             val config = json.decodeFromString<ConnectionConfig>(qrData)
 
-            // Validate config
-            if (config.url.isBlank() || config.clientId.isBlank() || config.clientSecret.isBlank()) {
-                return Result.failure(Exception("Invalid QR code data"))
+            // Validate config - credentials optional for localhost
+            if (config.url.isBlank()) {
+                return Result.failure(Exception("URL is required"))
+            }
+            
+            val isLocalhost = config.url.contains("localhost") || config.url.contains("127.0.0.1")
+            if (!isLocalhost && (config.clientId.isBlank() || config.clientSecret.isBlank())) {
+                return Result.failure(Exception("Credentials required for remote connections"))
             }
 
             // Attempt connection

@@ -23,6 +23,9 @@ class QRScannerViewModel @Inject constructor(
 
     private val _state = MutableStateFlow<QRScannerState>(QRScannerState.Scanning)
     val state: StateFlow<QRScannerState> = _state.asStateFlow()
+    
+    private val _showManualEntry = MutableStateFlow(false)
+    val showManualEntry: StateFlow<Boolean> = _showManualEntry.asStateFlow()
 
     fun onQRCodeScanned(qrData: String) {
         viewModelScope.launch {
@@ -42,5 +45,37 @@ class QRScannerViewModel @Inject constructor(
 
     fun resetToScanning() {
         _state.value = QRScannerState.Scanning
+    }
+    
+    fun showManualEntry() {
+        _showManualEntry.value = true
+    }
+    
+    fun hideManualEntry() {
+        _showManualEntry.value = false
+    }
+    
+    fun connectManually(url: String, clientId: String, clientSecret: String) {
+        viewModelScope.launch {
+            _state.value = QRScannerState.Processing
+            _showManualEntry.value = false
+            
+            // For localhost, use dummy credentials if not provided
+            val isLocalhost = url.contains("localhost") || url.contains("127.0.0.1")
+            val finalClientId = if (clientId.isBlank() && isLocalhost) "local" else clientId
+            val finalClientSecret = if (clientSecret.isBlank() && isLocalhost) "local" else clientSecret
+            
+            val qrData = """
+                {
+                    "url": "$url",
+                    "clientId": "$finalClientId",
+                    "clientSecret": "$finalClientSecret",
+                    "protocol": "acp",
+                    "version": "1.0"
+                }
+            """.trimIndent()
+            
+            onQRCodeScanned(qrData)
+        }
     }
 }

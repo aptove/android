@@ -62,12 +62,18 @@ class ACPClient @Inject constructor() {
             reconnectAttempt = 0
 
             // Create protocol with WebSocket transport
+            val wsUrl = config.toWebSocketUrl()
+            val isLocalhost = wsUrl.contains("localhost") || wsUrl.contains("127.0.0.1")
+            
             val newProtocol = httpClient.acpProtocolOnClientWebSocket(
-                url = config.toWebSocketUrl(),
+                url = wsUrl,
                 protocolOptions = ProtocolOptions()
             ) {
-                headers.append("CF-Access-Client-Id", config.clientId)
-                headers.append("CF-Access-Client-Secret", config.clientSecret)
+                // Only send Cloudflare headers for remote connections
+                if (!isLocalhost && config.clientId.isNotBlank() && config.clientSecret.isNotBlank()) {
+                    headers.append("CF-Access-Client-Id", config.clientId)
+                    headers.append("CF-Access-Client-Secret", config.clientSecret)
+                }
             }
 
             protocol = newProtocol
