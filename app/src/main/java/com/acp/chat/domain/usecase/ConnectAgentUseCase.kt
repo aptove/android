@@ -28,7 +28,7 @@ class ConnectAgentUseCase @Inject constructor(
                 return Result.failure(Exception("URL is required"))
             }
             
-            val isLocalhost = config.url.contains("localhost") || config.url.contains("127.0.0.1")
+            val isLocalhost = config.url.contains("localhost") || config.url.contains("127.0.0.1") || config.url.contains("10.0.2.2")
             if (!isLocalhost && (config.clientId.isBlank() || config.clientSecret.isBlank())) {
                 return Result.failure(Exception("Credentials required for remote connections"))
             }

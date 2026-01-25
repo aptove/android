@@ -22,11 +22,18 @@ enum class MessageType {
     TOOL_APPROVAL_REQUEST
 }
 
+data class PermissionOptionInfo(
+    val optionId: String,
+    val name: String,
+    val kind: String
+)
+
 data class ToolApprovalInfo(
     val toolCallId: String,
     val title: String,
     val command: String? = null,
-    val approved: Boolean? = null  // null=pending, true=approved, false=rejected
+    val approved: Boolean? = null,  // null=pending, true=approved, false=rejected
+    val options: List<PermissionOptionInfo> = emptyList()
 )
 
 @Entity(tableName = "messages")

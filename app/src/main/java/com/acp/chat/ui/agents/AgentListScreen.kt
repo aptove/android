@@ -133,7 +133,7 @@ private fun AgentItem(
                 modifier = Modifier
                     .size(48.dp)
                     .clip(CircleShape)
-                    .background(Color.hsv(agent.colorHue, 0.5f, 0.8f)),
+                    .background(Color.hsv(agent.colorHue.mod(360f), 0.5f, 0.8f)),
                 contentAlignment = Alignment.Center
             ) {
                 Text(

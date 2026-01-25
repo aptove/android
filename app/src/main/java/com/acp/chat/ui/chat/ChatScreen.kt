@@ -115,6 +115,7 @@ private fun MessageBubble(
     viewModel: ChatViewModel
 ) {
     val isUser = message.sender == MessageSender.USER
+    val uiState by viewModel.uiState.collectAsState()
     
     // Tool approval message styling
     if (message.type == MessageType.TOOL_APPROVAL_REQUEST) {
@@ -141,40 +142,115 @@ private fun MessageBubble(
                         // Show buttons if not yet decided
                         if (toolApproval.approved == null) {
                             Spacer(modifier = Modifier.height(12.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                Button(
-                                    onClick = { viewModel.approveTool(message.id) },
-                                    modifier = Modifier.weight(1f),
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = Color(0xFF4CAF50)
-                                    )
+                            
+                            // Get available options from the ViewModel state
+                            val options = uiState.pendingApprovalOptions[message.id]
+                            android.util.Log.d("ChatScreen", "Rendering approval for message ${message.id}, options: ${options?.size}")
+                            
+                            if (!options.isNullOrEmpty()) {
+                                // Display all available options dynamically
+                                Column(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    Icon(
-                                        Icons.Default.Check,
-                                        contentDescription = "Approve",
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text("Approve")
+                                    options.forEach { option ->
+                                        val isAllowOption = option.kind.startsWith("allow")
+                                        val isRejectOption = option.kind.startsWith("reject")
+                                        
+                                        if (isAllowOption) {
+                                            // Allow options (green button)
+                                            Button(
+                                                onClick = { viewModel.approveTool(message.id, option.optionId) },
+                                                modifier = Modifier.fillMaxWidth(),
+                                                colors = ButtonDefaults.buttonColors(
+                                                    containerColor = Color(0xFF4CAF50)
+                                                )
+                                            ) {
+                                                Icon(
+                                                    Icons.Default.Check,
+                                                    contentDescription = option.name,
+                                                    modifier = Modifier.size(18.dp)
+                                                )
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text(option.name)
+                                            }
+                                        } else if (isRejectOption) {
+                                            // Reject options (outlined red button)
+                                            OutlinedButton(
+                                                onClick = { viewModel.approveTool(message.id, option.optionId) },
+                                                modifier = Modifier.fillMaxWidth(),
+                                                colors = ButtonDefaults.outlinedButtonColors(
+                                                    contentColor = Color(0xFFF44336)
+                                                )
+                                            ) {
+                                                Icon(
+                                                    Icons.Default.Close,
+                                                    contentDescription = option.name,
+                                                    modifier = Modifier.size(18.dp)
+                                                )
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text(option.name)
+                                            }
+                                        } else {
+                                            // Unknown option kind (default button)
+                                            Button(
+                                                onClick = { viewModel.approveTool(message.id, option.optionId) },
+                                                modifier = Modifier.fillMaxWidth()
+                                            ) {
+                                                Text(option.name)
+                                            }
+                                        }
+                                    }
+                                    
+                                    // Always show a cancel button at the bottom
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    OutlinedButton(
+                                        onClick = { viewModel.rejectTool(message.id) },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = ButtonDefaults.outlinedButtonColors(
+                                            contentColor = MaterialTheme.colorScheme.outline
+                                        )
+                                    ) {
+                                        Text("Cancel")
+                                    }
                                 }
-                                
-                                OutlinedButton(
-                                    onClick = { viewModel.rejectTool(message.id) },
-                                    modifier = Modifier.weight(1f),
-                                    colors = ButtonDefaults.outlinedButtonColors(
-                                        contentColor = Color(0xFFF44336)
-                                    )
+                            } else {
+                                // Fallback to default approve/reject if no options available
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                                 ) {
-                                    Icon(
-                                        Icons.Default.Close,
-                                        contentDescription = "Reject",
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text("Reject")
+                                    Button(
+                                        onClick = { viewModel.approveTool(message.id, "allow_once") },
+                                        modifier = Modifier.weight(1f),
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = Color(0xFF4CAF50)
+                                        )
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Check,
+                                            contentDescription = "Approve",
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Approve")
+                                    }
+                                    
+                                    OutlinedButton(
+                                        onClick = { viewModel.rejectTool(message.id) },
+                                        modifier = Modifier.weight(1f),
+                                        colors = ButtonDefaults.outlinedButtonColors(
+                                            contentColor = Color(0xFFF44336)
+                                        )
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Close,
+                                            contentDescription = "Reject",
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Reject")
+                                    }
                                 }
                             }
                         } else {

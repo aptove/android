@@ -36,7 +36,6 @@ class ACPClient @Inject constructor() {
     private val httpClient = HttpClient(OkHttp) {
         install(WebSockets) {
             pingInterval = 30.seconds
-            maxFrameSize = Long.MAX_VALUE
         }
     }
 
@@ -49,7 +48,7 @@ class ACPClient @Inject constructor() {
     
     // Tool approval management
     private val pendingApprovals = mutableMapOf<String, CancellableContinuation<RequestPermissionResponse>>()
-    var onToolApprovalRequest: ((String, String, String?) -> Unit)? = null
+    var onToolApprovalRequest: ((String, String, String?, List<PermissionOption>) -> Unit)? = null
 
     private var reconnectJob: Job? = null
     private var reconnectAttempt = 0
@@ -63,7 +62,7 @@ class ACPClient @Inject constructor() {
 
             // Create protocol with WebSocket transport
             val wsUrl = config.toWebSocketUrl()
-            val isLocalhost = wsUrl.contains("localhost") || wsUrl.contains("127.0.0.1")
+            val isLocalhost = wsUrl.contains("localhost") || wsUrl.contains("127.0.0.1") || wsUrl.contains("10.0.2.2")
             
             val newProtocol = httpClient.acpProtocolOnClientWebSocket(
                 url = wsUrl,
@@ -159,7 +158,8 @@ class ACPClient @Inject constructor() {
                             onToolApprovalRequest?.invoke(
                                 requestId,
                                 toolCall.title ?: "Tool Approval Required",
-                                null
+                                null,
+                                permissions
                             )
                         }
                     }
@@ -254,6 +254,33 @@ class ACPClient @Inject constructor() {
                             is SessionUpdate.AgentThoughtChunk -> {
                                 // Could handle thought display
                             }
+                            is SessionUpdate.ToolCall -> {
+                                // New tool call initiated
+                                val toolInfo = buildString {
+                                    append("🔧 **${update.title}**\n")
+                                    append("Status: ${update.status?.name ?: "started"}\n")
+                                    update.rawInput?.let {
+                                        append("\n📥 Input:\n```json\n$it\n```\n")
+                                    }
+                                    update.rawOutput?.let {
+                                        append("\n📤 Output:\n```json\n$it\n```\n")
+                                    }
+                                }
+                                emit(ACPMessage.TextChunk(toolInfo, isComplete = false))
+                            }
+                            is SessionUpdate.ToolCallUpdate -> {
+                                // Tool call status update
+                                val toolInfo = buildString {
+                                    append("🔧 **${update.title ?: "Tool"}** - ${update.status?.name ?: "updated"}\n")
+                                    update.rawInput?.let {
+                                        append("\n📥 Input:\n```json\n$it\n```\n")
+                                    }
+                                    update.rawOutput?.let {
+                                        append("\n📤 Output:\n```json\n$it\n```\n")
+                                    }
+                                }
+                                emit(ACPMessage.TextChunk(toolInfo, isComplete = false))
+                            }
                             else -> {
                                 // Handle other update types
                             }
@@ -267,12 +294,12 @@ class ACPClient @Inject constructor() {
             }
     }.flowOn(Dispatchers.IO)
 
-    fun approveTool(toolCallId: String) {
+    fun approveTool(toolCallId: String, optionId: String = "allow_once") {
         val continuation = pendingApprovals.remove(toolCallId)
         continuation?.resume(
             RequestPermissionResponse(
                 outcome = RequestPermissionOutcome.Selected(
-                    optionId = PermissionOptionId("approve")
+                    optionId = PermissionOptionId(optionId)
                 )
             )
         ) {}
@@ -282,7 +309,9 @@ class ACPClient @Inject constructor() {
         val continuation = pendingApprovals.remove(toolCallId)
         continuation?.resume(
             RequestPermissionResponse(
-                outcome = RequestPermissionOutcome.Cancelled
+                outcome = RequestPermissionOutcome.Selected(
+                    optionId = PermissionOptionId("reject_once")
+                )
             )
         ) {}
     }

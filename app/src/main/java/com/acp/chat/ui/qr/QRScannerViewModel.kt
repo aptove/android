@@ -61,7 +61,7 @@ class QRScannerViewModel @Inject constructor(
             _showManualEntry.value = false
             
             // For localhost, use dummy credentials if not provided
-            val isLocalhost = url.contains("localhost") || url.contains("127.0.0.1")
+            val isLocalhost = url.contains("localhost") || url.contains("127.0.0.1") || url.contains("10.0.2.2")
             val finalClientId = if (clientId.isBlank() && isLocalhost) "local" else clientId
             val finalClientSecret = if (clientSecret.isBlank() && isLocalhost) "local" else clientSecret
             

@@ -22,5 +22,5 @@ data class Agent(
     val connectionStatus: ConnectionStatus = ConnectionStatus.DISCONNECTED,
     val lastConnectedAt: Long? = null,
     val createdAt: Long = System.currentTimeMillis(),
-    val colorHue: Float = (id.hashCode() % 360).toFloat()
+    val colorHue: Float = (id.hashCode().toFloat().mod(360f))
 )

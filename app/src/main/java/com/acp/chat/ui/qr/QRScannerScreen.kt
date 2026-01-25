@@ -152,7 +152,7 @@ private fun ManualEntryDialog(
     onDismiss: () -> Unit,
     onConnect: (String, String, String) -> Unit
 ) {
-    var url by remember { mutableStateOf("ws://localhost:8080") }
+    var url by remember { mutableStateOf("ws://10.0.2.2:8080") }
     var clientId by remember { mutableStateOf("") }
     var clientSecret by remember { mutableStateOf("") }
     
@@ -175,7 +175,7 @@ private fun ManualEntryDialog(
                     value = url,
                     onValueChange = { url = it },
                     label = { Text("WebSocket URL") },
-                    placeholder = { Text("ws://localhost:8080") },
+                    placeholder = { Text("ws://10.0.2.2:8080") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )

@@ -8,6 +8,7 @@ import com.acp.chat.data.model.Message
 import com.acp.chat.data.model.MessageSender
 import com.acp.chat.data.model.MessageStatus
 import com.acp.chat.data.model.MessageType
+import com.acp.chat.data.model.PermissionOptionInfo
 import com.acp.chat.data.repository.AgentRepository
 import com.acp.chat.data.repository.MessageRepository
 import com.acp.chat.domain.usecase.SendMessageUseCase
@@ -23,7 +24,8 @@ data class ChatUiState(
     val inputText: String = "",
     val isSending: Boolean = false,
     val error: String? = null,
-    val session: ClientSession? = null
+    val session: ClientSession? = null,
+    val pendingApprovalOptions: Map<String, List<PermissionOptionInfo>> = emptyMap()
 )
 
 @HiltViewModel
@@ -71,9 +73,18 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             // Get ACPClient from repository to set up approval handler
             val acpClient = agentRepository.getACPClient()
-            acpClient.onToolApprovalRequest = { toolCallId, title, command ->
+            acpClient.onToolApprovalRequest = { toolCallId, title, command, options ->
+                android.util.Log.d("ChatViewModel", "Tool approval request: $title, options: ${options.size}")
                 viewModelScope.launch {
                     val commandText = command?.let { "\n\n`$it`" } ?: ""
+                    val permissionOptions = options.map {
+                        com.acp.chat.data.model.PermissionOptionInfo(
+                            optionId = it.optionId.value,
+                            name = it.name,
+                            kind = it.kind.name
+                        )
+                    }
+                    android.util.Log.d("ChatViewModel", "Mapped permission options: ${permissionOptions.size}")
                     val approvalMessage = Message(
                         agentId = agentId,
                         text = "⚠️ **Permission Required**\n\n$title$commandText",
@@ -86,6 +97,14 @@ class ChatViewModel @Inject constructor(
                         toolApproved = null
                     )
                     messageRepository.insertMessage(approvalMessage)
+                    
+                    // Store options in memory mapped to message ID
+                    _uiState.update { state ->
+                        val newOptionsMap = state.pendingApprovalOptions.toMutableMap()
+                        newOptionsMap[approvalMessage.id] = permissionOptions
+                        android.util.Log.d("ChatViewModel", "Stored options for message ${approvalMessage.id}: ${permissionOptions.map { it.name }}")
+                        state.copy(pendingApprovalOptions = newOptionsMap)
+                    }
                 }
             }
         }
@@ -95,10 +114,44 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             val result = agentRepository.connectToAgent(agentId)
             if (result.isSuccess) {
-                _uiState.update { it.copy(session = result.getOrNull()) }
+                val session = result.getOrNull()
+                _uiState.update { it.copy(session = session) }
+                
+                // Send conversation history to the agent for context
+                session?.let { sendConversationHistory(it) }
             } else {
                 _uiState.update { it.copy(error = "Failed to connect: ${result.exceptionOrNull()?.message}") }
             }
+        }
+    }
+    
+    private suspend fun sendConversationHistory(session: ClientSession) {
+        val messages = _uiState.value.messages
+        if (messages.isEmpty()) return
+        
+        // Build a context message with recent conversation history
+        val historyText = buildString {
+            append("Here is our previous conversation for context:\n\n")
+            messages.takeLast(20).forEach { msg ->  // Last 20 messages to avoid overwhelming context
+                when (msg.sender) {
+                    MessageSender.USER -> append("User: ${msg.text}\n\n")
+                    MessageSender.AGENT -> append("Assistant: ${msg.text}\n\n")
+                }
+            }
+            append("Please continue from where we left off.")
+        }
+        
+        android.util.Log.d("ChatViewModel", "Sending conversation history with ${messages.size} messages")
+        
+        // Send history as a system-like message (user message with context flag)
+        try {
+            sendMessageUseCase(
+                agentId = agentId,
+                session = session,
+                text = historyText
+            )
+        } catch (e: Exception) {
+            android.util.Log.e("ChatViewModel", "Failed to send conversation history", e)
         }
     }
 
@@ -142,18 +195,26 @@ class ChatViewModel @Inject constructor(
         _uiState.update { it.copy(error = null) }
     }
     
-    fun approveTool(messageId: String) {
+    fun approveTool(messageId: String, optionId: String) {
         viewModelScope.launch {
             val message = _uiState.value.messages.find { it.id == messageId }
             val toolCallId = message?.toolCallId ?: return@launch
             
             // Update message in DB with approved status
-            val updatedMessage = message.copy(toolApproved = true)
+            val isApproved = optionId.contains("allow", ignoreCase = true)
+            val updatedMessage = message.copy(toolApproved = isApproved)
             messageRepository.insertMessage(updatedMessage)
             
-            // Resume the continuation in ACPClient
+            // Resume the continuation in ACPClient with selected option
             val acpClient = agentRepository.getACPClient()
-            acpClient.approveTool(toolCallId)
+            acpClient.approveTool(toolCallId, optionId)
+            
+            // Clean up options from memory
+            _uiState.update { state ->
+                val newOptionsMap = state.pendingApprovalOptions.toMutableMap()
+                newOptionsMap.remove(messageId)
+                state.copy(pendingApprovalOptions = newOptionsMap)
+            }
         }
     }
     
