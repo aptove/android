@@ -22,6 +22,12 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
+        
+        // Configure NDK to support 16 KB page sizes
+        ndk {
+            // Specify supported ABIs with proper page alignment
+            abiFilters.addAll(listOf("arm64-v8a", "armeabi-v7a", "x86", "x86_64"))
+        }
     }
 
     buildTypes {
@@ -50,6 +56,13 @@ android {
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
+        
+        // Optimize native libraries for 16 KB page size support
+        jniLibs {
+            useLegacyPackaging = false
+            // Pick first occurrence of any duplicate libraries
+            pickFirsts.add("**/*.so")
         }
     }
 }
