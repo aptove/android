@@ -71,6 +71,20 @@ fun QRScannerScreen(
                     ) {
                         Text(stringResource(R.string.qr_scanner_instructions))
                         
+                        // Manual entry button
+                        OutlinedButton(
+                            onClick = { viewModel.showManualEntry() },
+                            modifier = Modifier.fillMaxWidth(0.8f)
+                        ) {
+                            Icon(
+                                Icons.Default.Edit,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Enter URL Manually")
+                        }
+                        
                         // Placeholder - would integrate with CameraX + ZXing
                         Button(onClick = {
                             // For demo: simulate QR scan with sample data
