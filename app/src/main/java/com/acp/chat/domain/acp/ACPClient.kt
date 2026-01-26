@@ -296,24 +296,32 @@ class ACPClient @Inject constructor() {
 
     fun approveTool(toolCallId: String, optionId: String = "allow_once") {
         val continuation = pendingApprovals.remove(toolCallId)
-        continuation?.resume(
-            RequestPermissionResponse(
-                outcome = RequestPermissionOutcome.Selected(
-                    optionId = PermissionOptionId(optionId)
+        if (continuation != null) {
+            android.util.Log.d("ACPClient", "✅ Tool approved: $toolCallId with option: $optionId")
+            continuation.resume(
+                RequestPermissionResponse(
+                    outcome = RequestPermissionOutcome.Selected(
+                        optionId = PermissionOptionId(optionId)
+                    )
                 )
-            )
-        ) {}
+            ) {}
+        } else {
+            android.util.Log.w("ACPClient", "⚠️ No pending approval found for toolCallId: $toolCallId")
+        }
     }
     
     fun rejectTool(toolCallId: String) {
         val continuation = pendingApprovals.remove(toolCallId)
-        continuation?.resume(
-            RequestPermissionResponse(
-                outcome = RequestPermissionOutcome.Selected(
-                    optionId = PermissionOptionId("reject_once")
+        if (continuation != null) {
+            android.util.Log.d("ACPClient", "❌ Tool rejected: $toolCallId")
+            continuation.resume(
+                RequestPermissionResponse(
+                    outcome = RequestPermissionOutcome.Cancelled
                 )
-            )
-        ) {}
+            ) {}
+        } else {
+            android.util.Log.w("ACPClient", "⚠️ No pending rejection found for toolCallId: $toolCallId")
+        }
     }
 
     suspend fun disconnect() {

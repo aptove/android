@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -31,6 +32,7 @@ fun AgentListScreen(
     viewModel: AgentListViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    var agentToDelete by remember { mutableStateOf<Agent?>(null) }
 
     Scaffold(
         topBar = {
@@ -60,15 +62,43 @@ fun AgentListScreen(
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(uiState.agents) { agent ->
+                    items(uiState.agents, key = { it.id }) { agent ->
                         AgentItem(
                             agent = agent,
-                            onClick = { onNavigateToChat(agent.id) }
+                            onClick = { onNavigateToChat(agent.id) },
+                            onDelete = { agentToDelete = agent }
                         )
                     }
                 }
             }
         }
+    }
+
+    // Delete confirmation dialog
+    agentToDelete?.let { agent ->
+        AlertDialog(
+            onDismissRequest = { agentToDelete = null },
+            title = { Text("Delete Agent?") },
+            text = { Text("Are you sure you want to delete \"${agent.name}\"? This will remove all conversation history.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.disconnectAgent(agent.id)
+                        agentToDelete = null
+                    },
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { agentToDelete = null }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 
     // Error dialog
@@ -114,7 +144,8 @@ private fun EmptyAgentsView(
 @Composable
 private fun AgentItem(
     agent: Agent,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onDelete: () -> Unit
 ) {
     Card(
         modifier = Modifier
@@ -161,6 +192,15 @@ private fun AgentItem(
                         ConnectionStatus.DISCONNECTED -> Color(0xFF9E9E9E)
                         ConnectionStatus.RECONNECTING -> Color(0xFFFFA726)
                     }
+                )
+            }
+
+            // Delete button
+            IconButton(onClick = onDelete) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = "Delete agent",
+                    tint = MaterialTheme.colorScheme.error
                 )
             }
         }

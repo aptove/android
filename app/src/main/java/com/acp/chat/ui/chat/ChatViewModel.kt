@@ -198,7 +198,12 @@ class ChatViewModel @Inject constructor(
     fun approveTool(messageId: String, optionId: String) {
         viewModelScope.launch {
             val message = _uiState.value.messages.find { it.id == messageId }
-            val toolCallId = message?.toolCallId ?: return@launch
+            val toolCallId = message?.toolCallId ?: run {
+                android.util.Log.w("ChatViewModel", "⚠️ No toolCallId found for message: $messageId")
+                return@launch
+            }
+            
+            android.util.Log.d("ChatViewModel", "✅ Approving tool: $toolCallId with option: $optionId")
             
             // Update message in DB with approved status
             val isApproved = optionId.contains("allow", ignoreCase = true)
@@ -221,7 +226,12 @@ class ChatViewModel @Inject constructor(
     fun rejectTool(messageId: String) {
         viewModelScope.launch {
             val message = _uiState.value.messages.find { it.id == messageId }
-            val toolCallId = message?.toolCallId ?: return@launch
+            val toolCallId = message?.toolCallId ?: run {
+                android.util.Log.w("ChatViewModel", "⚠️ No toolCallId found for message: $messageId")
+                return@launch
+            }
+            
+            android.util.Log.d("ChatViewModel", "❌ Rejecting tool: $toolCallId")
             
             // Update message in DB with rejected status
             val updatedMessage = message.copy(toolApproved = false)
@@ -230,6 +240,13 @@ class ChatViewModel @Inject constructor(
             // Resume the continuation in ACPClient with cancellation
             val acpClient = agentRepository.getACPClient()
             acpClient.rejectTool(toolCallId)
+            
+            // Clean up options from memory
+            _uiState.update { state ->
+                val newOptionsMap = state.pendingApprovalOptions.toMutableMap()
+                newOptionsMap.remove(messageId)
+                state.copy(pendingApprovalOptions = newOptionsMap)
+            }
         }
     }
 
