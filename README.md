@@ -5,6 +5,7 @@ A mobile chat application for Android that enables users to connect with AI agen
 ## Features
 
 - **QR Code Agent Connection** - Scan QR codes to connect to AI agents
+- **Manual URL Entry** - Enter agent URLs manually for flexible connection options
 - **Agent Management** - Manage multiple agent connections
 - **Real-time Chat** - Send and receive messages with AI agents
 - **Message Streaming** - Display agent responses as they stream in
