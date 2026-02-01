@@ -7,6 +7,7 @@ data class ConnectionConfig(
     val url: String,
     val clientId: String,
     val clientSecret: String,
+    val authToken: String? = null,
     val protocol: String = "acp",
     val version: String = "1.0"
 ) {

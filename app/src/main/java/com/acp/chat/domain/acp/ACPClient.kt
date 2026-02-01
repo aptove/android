@@ -73,6 +73,11 @@ class ACPClient @Inject constructor() {
                     headers.append("CF-Access-Client-Id", config.clientId)
                     headers.append("CF-Access-Client-Secret", config.clientSecret)
                 }
+                
+                // Send bridge auth token if provided
+                if (!config.authToken.isNullOrBlank()) {
+                    headers.append("X-Bridge-Token", config.authToken)
+                }
             }
 
             protocol = newProtocol
