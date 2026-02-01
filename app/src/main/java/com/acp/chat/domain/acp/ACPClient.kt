@@ -1,5 +1,6 @@
 package com.acp.chat.domain.acp
 
+import android.util.Log
 import com.acp.chat.data.model.ConnectionConfig
 import com.agentclientprotocol.agent.AgentInfo
 import com.agentclientprotocol.client.Client
@@ -18,8 +19,14 @@ import io.ktor.client.plugins.websocket.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.serialization.json.JsonElement
+import okhttp3.OkHttpClient
+import java.security.MessageDigest
+import java.security.cert.X509Certificate
 import javax.inject.Inject
 import javax.inject.Singleton
+import javax.net.ssl.SSLContext
+import javax.net.ssl.TrustManager
+import javax.net.ssl.X509TrustManager
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.pow
 import kotlin.time.Duration.Companion.seconds
@@ -33,11 +40,7 @@ data class ToolApprovalRequest(
 @Singleton
 class ACPClient @Inject constructor() {
     
-    private val httpClient = HttpClient(OkHttp) {
-        install(WebSockets) {
-            pingInterval = 30.seconds
-        }
-    }
+    private var httpClient: HttpClient? = null
 
     private var protocol: Protocol? = null
     private var client: Client? = null
@@ -53,23 +56,100 @@ class ACPClient @Inject constructor() {
     private var reconnectJob: Job? = null
     private var reconnectAttempt = 0
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    
+    /**
+     * Create an HttpClient with optional self-signed certificate support
+     */
+    private fun createHttpClient(config: ConnectionConfig): HttpClient {
+        return HttpClient(OkHttp) {
+            install(WebSockets) {
+                pingInterval = 30.seconds
+            }
+            
+            // Configure OkHttp for self-signed certificates if needed
+            if (config.hasSelfSignedCert) {
+                engine {
+                    preconfigured = createSelfSignedTrustingOkHttpClient(config.certFingerprint)
+                }
+            }
+        }
+    }
+    
+    /**
+     * Create an OkHttpClient that trusts a self-signed certificate with the given fingerprint
+     */
+    private fun createSelfSignedTrustingOkHttpClient(expectedFingerprint: String?): OkHttpClient {
+        val trustManager = object : X509TrustManager {
+            override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {
+                // Not used for client certificates
+            }
+            
+            override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {
+                if (chain.isNullOrEmpty()) {
+                    throw java.security.cert.CertificateException("No certificates in chain")
+                }
+                
+                val serverCert = chain[0]
+                val actualFingerprint = calculateFingerprint(serverCert)
+                
+                Log.d("ACPClient", "🔐 Server cert fingerprint: $actualFingerprint")
+                Log.d("ACPClient", "🔐 Expected fingerprint: $expectedFingerprint")
+                
+                if (expectedFingerprint != null && 
+                    actualFingerprint.equals(expectedFingerprint, ignoreCase = true)) {
+                    Log.d("ACPClient", "🔐 Certificate fingerprint matches!")
+                    return // Certificate is trusted
+                }
+                
+                throw java.security.cert.CertificateException(
+                    "Certificate fingerprint mismatch. Expected: $expectedFingerprint, Got: $actualFingerprint"
+                )
+            }
+            
+            override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
+        }
+        
+        val sslContext = SSLContext.getInstance("TLS")
+        sslContext.init(null, arrayOf<TrustManager>(trustManager), java.security.SecureRandom())
+        
+        return OkHttpClient.Builder()
+            .sslSocketFactory(sslContext.socketFactory, trustManager)
+            .hostnameVerifier { _, _ -> true } // Allow any hostname for local development
+            .build()
+    }
+    
+    /**
+     * Calculate SHA256 fingerprint of a certificate, formatted as colon-separated hex
+     */
+    private fun calculateFingerprint(cert: X509Certificate): String {
+        val md = MessageDigest.getInstance("SHA-256")
+        val digest = md.digest(cert.encoded)
+        return digest.joinToString(":") { String.format("%02X", it) }
+    }
 
     suspend fun connect(config: ConnectionConfig): Result<AgentInfo> = withContext(Dispatchers.IO) {
         try {
             _connectionState.value = ACPConnectionState.Connecting
             currentConfig = config
             reconnectAttempt = 0
+            
+            // Close existing client if any
+            httpClient?.close()
+            
+            // Create new HTTP client with appropriate TLS settings
+            val newHttpClient = createHttpClient(config)
+            httpClient = newHttpClient
 
             // Create protocol with WebSocket transport
             val wsUrl = config.toWebSocketUrl()
             val isLocalhost = wsUrl.contains("localhost") || wsUrl.contains("127.0.0.1") || wsUrl.contains("10.0.2.2")
             
-            val newProtocol = httpClient.acpProtocolOnClientWebSocket(
+            val newProtocol = newHttpClient.acpProtocolOnClientWebSocket(
                 url = wsUrl,
                 protocolOptions = ProtocolOptions()
             ) {
-                // Only send Cloudflare headers for remote connections
-                if (!isLocalhost && config.clientId.isNotBlank() && config.clientSecret.isNotBlank()) {
+                // Only send Cloudflare headers for remote connections with credentials
+                if (!isLocalhost && !config.clientId.isNullOrBlank() && !config.clientSecret.isNullOrBlank()) {
                     headers.append("CF-Access-Client-Id", config.clientId)
                     headers.append("CF-Access-Client-Secret", config.clientSecret)
                 }
@@ -346,6 +426,6 @@ class ACPClient @Inject constructor() {
         pendingApprovals.values.forEach { it.cancel() }
         pendingApprovals.clear()
         scope.cancel()
-        httpClient.close()
+        httpClient?.close()
     }
 }
