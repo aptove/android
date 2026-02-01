@@ -1,20 +1,28 @@
 package com.acp.chat.ui.qr
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.acp.chat.R
+import com.journeyapps.barcodescanner.ScanContract
+import com.journeyapps.barcodescanner.ScanOptions
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -24,6 +32,55 @@ fun QRScannerScreen(
     viewModel: QRScannerViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
+    val context = LocalContext.current
+
+    // QR Scanner launcher
+    val scanLauncher = rememberLauncherForActivityResult(ScanContract()) { result ->
+        result.contents?.let { qrContent ->
+            viewModel.onQRCodeScanned(qrContent)
+        }
+    }
+
+    // Camera permission launcher
+    val permissionLauncher = rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            // Launch scanner after permission granted
+            val options = ScanOptions().apply {
+                setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+                setPrompt("Scan QR code from bridge")
+                setCameraId(0)
+                setBeepEnabled(false)
+                setBarcodeImageEnabled(false)
+                setOrientationLocked(false)
+            }
+            scanLauncher.launch(options)
+        }
+    }
+
+    // Function to launch scanner
+    fun launchScanner() {
+        when {
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.CAMERA
+            ) == PackageManager.PERMISSION_GRANTED -> {
+                val options = ScanOptions().apply {
+                    setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+                    setPrompt("Scan QR code from bridge")
+                    setCameraId(0)
+                    setBeepEnabled(false)
+                    setBarcodeImageEnabled(false)
+                    setOrientationLocked(false)
+                }
+                scanLauncher.launch(options)
+            }
+            else -> {
+                permissionLauncher.launch(Manifest.permission.CAMERA)
+            }
+        }
+    }
 
     LaunchedEffect(state) {
         when (val currentState = state) {
@@ -67,9 +124,26 @@ fun QRScannerScreen(
                 is QRScannerState.Scanning -> {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                        modifier = Modifier.padding(16.dp)
                     ) {
                         Text(stringResource(R.string.qr_scanner_instructions))
+                        
+                        // Scan QR Code button
+                        Button(
+                            onClick = { launchScanner() },
+                            modifier = Modifier.fillMaxWidth(0.8f)
+                        ) {
+                            Icon(
+                                Icons.Default.QrCodeScanner,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Scan QR Code")
+                        }
+                        
+                        Spacer(modifier = Modifier.height(8.dp))
                         
                         // Manual entry button
                         OutlinedButton(
@@ -83,23 +157,6 @@ fun QRScannerScreen(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("Enter URL Manually")
-                        }
-                        
-                        // Placeholder - would integrate with CameraX + ZXing
-                        Button(onClick = {
-                            // For demo: simulate QR scan with sample data
-                            val sampleQR = """
-                                {
-                                    "url": "https://agent.example.com",
-                                    "clientId": "test.access",
-                                    "clientSecret": "secret123",
-                                    "protocol": "acp",
-                                    "version": "1.0"
-                                }
-                            """.trimIndent()
-                            viewModel.onQRCodeScanned(sampleQR)
-                        }) {
-                            Text("Simulate QR Scan (Demo)")
                         }
                     }
                 }
