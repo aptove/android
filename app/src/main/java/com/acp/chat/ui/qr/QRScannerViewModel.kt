@@ -33,9 +33,6 @@ class QRScannerViewModel @Inject constructor(
     private val _state = MutableStateFlow<QRScannerState>(QRScannerState.Scanning)
     val state: StateFlow<QRScannerState> = _state.asStateFlow()
     
-    private val _showManualEntry = MutableStateFlow(false)
-    val showManualEntry: StateFlow<Boolean> = _showManualEntry.asStateFlow()
-    
     private val _showPairingEntry = MutableStateFlow(false)
     val showPairingEntry: StateFlow<Boolean> = _showPairingEntry.asStateFlow()
 
@@ -136,47 +133,12 @@ class QRScannerViewModel @Inject constructor(
         _state.value = QRScannerState.Scanning
     }
     
-    fun showManualEntry() {
-        _showManualEntry.value = true
-    }
-    
-    fun hideManualEntry() {
-        _showManualEntry.value = false
-    }
-    
     fun showPairingEntry() {
         _showPairingEntry.value = true
     }
     
     fun hidePairingEntry() {
         _showPairingEntry.value = false
-    }
-    
-    /**
-     * Connect using legacy manual entry (URL + credentials).
-     */
-    fun connectManually(url: String, clientId: String, clientSecret: String) {
-        viewModelScope.launch {
-            _state.value = QRScannerState.Processing
-            _showManualEntry.value = false
-            
-            // For localhost, use dummy credentials if not provided
-            val isLocalhost = url.contains("localhost") || url.contains("127.0.0.1") || url.contains("10.0.2.2")
-            val finalClientId = if (clientId.isBlank() && isLocalhost) "local" else clientId
-            val finalClientSecret = if (clientSecret.isBlank() && isLocalhost) "local" else clientSecret
-            
-            val qrData = """
-                {
-                    "url": "$url",
-                    "clientId": "$finalClientId",
-                    "clientSecret": "$finalClientSecret",
-                    "protocol": "acp",
-                    "version": "1.0"
-                }
-            """.trimIndent()
-            
-            handleLegacyJSON(qrData)
-        }
     }
     
     /**
