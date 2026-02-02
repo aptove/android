@@ -7,6 +7,24 @@
         <domain includeSubdomains="true">10.0.2.2</domain>
     </domain-config>
     
+    <!-- 
+    Local network domains for bridge connections.
+    The bridge uses self-signed certificates, so we handle cert validation 
+    programmatically in PairingService with certificate pinning.
+    -->
+    <domain-config cleartextTrafficPermitted="false">
+        <!-- Common private IP ranges for local network -->
+        <domain includeSubdomains="true">192.168.0.0</domain>
+        <domain includeSubdomains="true">192.168.1.0</domain>
+        <domain includeSubdomains="true">10.0.0.0</domain>
+        <domain includeSubdomains="true">172.16.0.0</domain>
+        <trust-anchors>
+            <!-- Trust user-added CAs for local development -->
+            <certificates src="user" />
+            <certificates src="system" />
+        </trust-anchors>
+    </domain-config>
+    
     <!-- Default security for production endpoints -->
     <base-config cleartextTrafficPermitted="false">
         <trust-anchors>

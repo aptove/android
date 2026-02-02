@@ -119,15 +119,15 @@ dependencies {
     // Ktor client engine for Android  
     implementation("io.ktor:ktor-client-okhttp:3.0.2")
 
-    // QR Code Scanning (ZXing)
-    implementation("com.google.zxing:core:3.5.3")
-    implementation("com.journeyapps:zxing-android-embedded:4.3.0")
+    // QR Code Scanning (ML Kit - better accuracy than ZXing)
+    implementation("com.google.mlkit:barcode-scanning:17.2.0")
 
     // CameraX for Camera - version 1.4.0+ has 16 KB page size support
     val cameraxVersion = "1.4.0"
     implementation("androidx.camera:camera-camera2:$cameraxVersion")
     implementation("androidx.camera:camera-lifecycle:$cameraxVersion")
     implementation("androidx.camera:camera-view:$cameraxVersion")
+    implementation("androidx.camera:camera-mlkit-vision:$cameraxVersion")
 
     // DataStore for simple preferences
     implementation("androidx.datastore:datastore-preferences:1.0.0")

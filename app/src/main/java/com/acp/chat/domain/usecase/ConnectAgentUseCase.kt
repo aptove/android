@@ -18,19 +18,37 @@ class ConnectAgentUseCase @Inject constructor(
         ignoreUnknownKeys = true
     }
 
+    /**
+     * Connect to an agent using QR code data (JSON format).
+     */
     suspend operator fun invoke(qrData: String): Result<Agent> {
         return try {
             // Parse QR code data
             val config = json.decodeFromString<ConnectionConfig>(qrData)
-
+            connectWithConfig(config)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+    
+    /**
+     * Connect to an agent using a pre-built ConnectionConfig.
+     * Used by the pairing service after successful pairing.
+     */
+    suspend fun connectWithConfig(config: ConnectionConfig): Result<Agent> {
+        return try {
             // Validate config - credentials optional for localhost
             if (config.url.isBlank()) {
                 return Result.failure(Exception("URL is required"))
             }
             
             val isLocalhost = config.url.contains("localhost") || config.url.contains("127.0.0.1") || config.url.contains("10.0.2.2")
-            if (!isLocalhost && (config.clientId.isNullOrBlank() || config.clientSecret.isNullOrBlank())) {
-                return Result.failure(Exception("Credentials required for remote connections"))
+            // For pairing-based connections, we have authToken instead of clientId/clientSecret
+            val hasAuth = !config.authToken.isNullOrBlank() || 
+                         (!config.clientId.isNullOrBlank() && !config.clientSecret.isNullOrBlank())
+            
+            if (!isLocalhost && !hasAuth) {
+                return Result.failure(Exception("Authentication required for remote connections"))
             }
 
             // Attempt connection
