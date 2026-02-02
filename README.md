@@ -4,15 +4,15 @@ A mobile chat application for Android that enables users to connect with AI agen
 
 ## Features
 
-- **QR Code Agent Connection** - Scan QR codes to connect to AI agents
-- **Manual URL Entry** - Enter agent URLs manually for flexible connection options
+- **Secure QR Pairing** - Scan QR codes to securely pair with local bridge
+- **Certificate Pinning** - TLS certificate validation prevents MITM attacks
+- **Manual Pairing** - Enter pairing code manually if QR scanning unavailable
 - **Agent Management** - Manage multiple agent connections
 - **Real-time Chat** - Send and receive messages with AI agents
 - **Message Streaming** - Display agent responses as they stream in
 - **Secure Credentials** - Android Keystore encryption for connection credentials
 - **Message Persistence** - Room database for offline message storage
 - **Material Design 3** - Modern UI with Jetpack Compose
-- **Lifecycle Aware** - Handles Android lifecycle events properly
 - **Full ACP Protocol** - Integrated with official ACP Kotlin SDK
 
 ## Requirements
@@ -49,11 +49,11 @@ app/
 - **Architecture**: MVVM + Clean Architecture
 - **DI**: Hilt
 - **Database**: Room
-- **Security**: Android Keystore + EncryptedSharedPreferences
+- **Security**: Android Keystore + EncryptedSharedPreferences + Certificate Pinning
 - **Networking**: ACP Kotlin SDK with Ktor WebSockets
 - **Serialization**: kotlinx.serialization
 - **Navigation**: Jetpack Navigation Compose
-- **QR Scanning**: ZXing + CameraX
+- **QR Scanning**: Google ML Kit + CameraX
 
 ## Building
 
@@ -96,24 +96,25 @@ includeBuild("../../../kotlin-sdk-repo") {
 
 ## Configuration
 
-The app connects to ACP agents using QR codes with the following format:
+The app connects to ACP agents by scanning a pairing QR code from the bridge:
 
-```json
-{
-  "url": "https://agent.yourdomain.com",
-  "clientId": "xxxxx.access",
-  "clientSecret": "xxxxxxxxxxxxxx",
-  "protocol": "acp",
-  "version": "1.0"
-}
 ```
+https://192.168.1.100:3001/pair/local?code=123456&fp=SHA256:XXXX...
+```
+
+The QR code contains:
+- **Pairing URL** - Bridge's HTTPS endpoint
+- **Pairing Code** - 6-digit one-time code (expires in 60 seconds)
+- **Certificate Fingerprint** - For TLS certificate pinning
+
+After successful pairing, the app receives WebSocket credentials securely.
 
 ## Security
 
 - **Credential Storage**: Uses Android Keystore with AES-256-GCM encryption
 - **Network Security**: HTTPS/WSS only (no cleartext traffic)
-- **Certificate Pinning**: Recommended for production (not implemented in demo)
-- **Biometric Auth**: Can be enabled for credential access
+- **Certificate Pinning**: Validates TLS certificate fingerprint from QR code
+- **Secure Pairing**: One-time codes with 60-second expiry and rate limiting
 
 ## ACP Protocol Implementation
 
@@ -169,21 +170,19 @@ Run instrumented tests:
 
 ## Known Limitations
 
-1. **QR Scanner**: The QR scanner screen includes a demo button for testing. Production implementation would use CameraX + ZXing for actual QR code scanning.
+1. **Background Sync**: Messages are not synced in background. App must be active for real-time communication.
 
-2. **Background Sync**: Messages are not synced in background. App must be active for real-time communication.
+2. **Single Agent Connection**: Currently supports one active connection at a time.
 
-3. **Single Agent Connection**: Currently supports one active connection at a time.
+3. **Local Network Only**: Secure pairing requires device to be on same network as bridge.
 
 ## Future Enhancements
 
-- [ ] Actual camera-based QR scanning
+- [ ] Cloudflare tunnel support for remote access
 - [ ] Push notifications for messages
 - [ ] File attachments support
 - [ ] Voice input
 - [ ] Session management (fork, resume)
-- [ ] Multi-device sync
-- [ ] End-to-end encryption
 - [ ] Multiple concurrent agent connections
 
 ## ⚖️ License & Trademarks
