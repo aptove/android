@@ -252,9 +252,9 @@ adb shell am start -n com.acp.chat/.MainActivity
 ## Remaining Work
 
 ### High Priority
-1. **Camera QR Scanning** - Replace demo button with CameraX
-2. **Unit Tests** - Test SDK integration
-3. **Error Recovery** - Handle connection drops better
+1. **Unit Tests** - Test SDK integration
+2. **Error Recovery** - Handle connection drops better
+3. **Cloudflare Support** - Remote access via tunnels
 
 ### Medium Priority
 4. **Multiple Connections** - Support concurrent agents
@@ -268,7 +268,7 @@ adb shell am start -n com.acp.chat/.MainActivity
 
 ## Conclusion
 
-The Android app now has **complete, production-ready ACP Kotlin SDK integration**. All protocol communication uses the official SDK with:
+The Android app now has **complete, production-ready ACP Kotlin SDK integration** with secure pairing. All protocol communication uses the official SDK with:
 
 - ✅ WebSocket transport
 - ✅ JSON-RPC 2.0 protocol
@@ -276,5 +276,7 @@ The Android app now has **complete, production-ready ACP Kotlin SDK integration*
 - ✅ Streaming support
 - ✅ Error handling
 - ✅ Session management
+- ✅ ML Kit QR scanner
+- ✅ Secure pairing with certificate pinning
 
 The placeholder implementation has been completely replaced with the real thing!

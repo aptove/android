@@ -42,7 +42,7 @@ Complete Android mobile chat application implementing the Agent Client Protocol 
 | Serialization | kotlinx.serialization |
 | Navigation | Jetpack Navigation Compose |
 | Async | Kotlin Coroutines + Flow |
-| QR Scanner | ZXing + CameraX |
+| QR Scanner | ML Kit + CameraX |
 
 ## Key Files
 
@@ -126,11 +126,11 @@ Complete Android mobile chat application implementing the Agent Client Protocol 
 - [x] Send button enabled/disabled
 - [x] Compose TextField with max lines
 
-### ⚠️ Simplified/Placeholder
-- [x] QR Scanner (has demo button, needs CameraX)
-- [x] ACP Protocol (simplified, needs full SDK)
-- [x] Reconnection (basic, needs tuning)
-- [x] Streaming (stub, needs implementation)
+### ✅ Fully Implemented
+- [x] QR Scanner (ML Kit + CameraX with embedded camera preview)
+- [x] Secure Pairing (certificate pinning, one-time codes)
+- [x] ACP Protocol (full SDK integration)
+- [x] Streaming (real-time message updates)
 
 ## Dependencies
 
@@ -165,9 +165,8 @@ androidx.security:security-crypto:1.1.0-alpha06
 org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2
 
 // QR Scanning
-com.google.zxing:core:3.5.3
-com.journeyapps:zxing-android-embedded:4.3.0
-androidx.camera:camera-camera2:1.3.1
+com.google.mlkit:barcode-scanning:17.2.0
+androidx.camera:camera-camera2:1.4.0
 ```
 
 ### Development Dependencies
@@ -244,37 +243,31 @@ data class Message(
 ## Next Steps for Full Production
 
 ### High Priority
-1. **Integrate ACP Kotlin SDK** - Replace ACPClient.kt with actual SDK
-2. **Implement Camera QR Scanning** - Add CameraX + ZXing integration
-3. **Complete Protocol Implementation** - Full JSON-RPC 2.0 handling
-4. **Add Unit Tests** - ViewModel, UseCase, Repository tests
-5. **Add UI Tests** - Compose UI testing
+1. **Add Unit Tests** - ViewModel, UseCase, Repository tests
+2. **Add UI Tests** - Compose UI testing
+3. **Cloudflare Tunnel Support** - Remote access outside local network
+4. **Push Notifications** - Background message delivery
 
 ### Medium Priority
-6. **Polish UI** - Animations, transitions, loading states
-7. **Improve Error Handling** - Retry logic, better messages
-8. **Add Analytics** - Track usage patterns
-9. **Optimize Performance** - Profile and fix bottlenecks
-10. **Add Accessibility** - Test with TalkBack
+5. **Polish UI** - Animations, transitions, loading states
+6. **Improve Error Handling** - Retry logic, better messages
+7. **Add Analytics** - Track usage patterns
+8. **Optimize Performance** - Profile and fix bottlenecks
+9. **Add Accessibility** - Test with TalkBack
 
 ### Low Priority
-11. **Push Notifications** - Background message delivery
-12. **File Attachments** - Image/document support
-13. **Voice Input** - Speech-to-text
-14. **Session Management UI** - Fork/resume sessions
-15. **Export Conversations** - PDF/text export
+10. **File Attachments** - Image/document support
+11. **Voice Input** - Speech-to-text
+12. **Session Management UI** - Fork/resume sessions
+13. **Export Conversations** - PDF/text export
 
 ## Known Issues
-
-### Blockers for Full Functionality
-- ❌ ACP Kotlin SDK not integrated (architecture ready)
-- ❌ QR scanner is placeholder (UI ready)
-- ❌ Message streaming simplified (Flow structure ready)
 
 ### Minor Issues
 - ⚠️ No launcher icon images (XML placeholder only)
 - ⚠️ Reconnection logic needs tuning
 - ⚠️ No tests implemented yet
+- ⚠️ Local network pairing only (Cloudflare tunnel support planned)
 
 ## Documentation
 - `README.md` - User-facing documentation
