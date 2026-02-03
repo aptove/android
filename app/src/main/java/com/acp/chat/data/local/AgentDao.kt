@@ -14,6 +14,9 @@ import kotlinx.coroutines.flow.Flow
 interface AgentDao {
     @Query("SELECT * FROM agents ORDER BY lastConnectedAt DESC, createdAt DESC")
     fun getAllAgents(): Flow<List<Agent>>
+    
+    @Query("SELECT * FROM agents ORDER BY lastConnectedAt DESC, createdAt DESC")
+    suspend fun getAllAgentsOnce(): List<Agent>
 
     @Query("SELECT * FROM agents WHERE id = :agentId")
     suspend fun getAgentById(agentId: String): Agent?

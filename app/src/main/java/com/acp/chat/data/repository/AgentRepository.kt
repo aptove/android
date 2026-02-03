@@ -40,6 +40,38 @@ class AgentRepository @Inject constructor(
     suspend fun updateAgent(agent: Agent) {
         agentDao.updateAgent(agent)
     }
+    
+    /**
+     * Find an agent by URL (for detecting duplicates or updates)
+     */
+    suspend fun findAgentByUrl(url: String): Agent? {
+        val normalizedUrl = url.trimEnd('/')
+        return agentDao.getAllAgentsOnce().find { agent ->
+            agent.url.trimEnd('/') == normalizedUrl
+        }
+    }
+    
+    /**
+     * Update credentials for an existing agent (when re-scanning QR after bridge restart)
+     */
+    suspend fun updateAgentCredentials(agentId: String, config: ConnectionConfig) {
+        Log.d(TAG, "📝 Updating credentials for agent $agentId")
+        
+        // Clear cached session
+        sessionCache.remove(agentId)
+        
+        // Disconnect if connected
+        acpClient.disconnect()
+        
+        // Update stored credentials
+        credentialStorage.saveCredentials(agentId, config)
+        
+        // Clear session info
+        agentDao.clearSessionInfo(agentId)
+        agentDao.updateConnectionStatus(agentId, ConnectionStatus.DISCONNECTED)
+        
+        Log.d(TAG, "✅ Credentials updated for agent $agentId")
+    }
 
     suspend fun deleteAgent(agentId: String) {
         val agent = agentDao.getAgentById(agentId) ?: return

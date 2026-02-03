@@ -12,6 +12,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.acp.chat.ui.agents.AgentConfigurationScreen
 import com.acp.chat.ui.agents.AgentListScreen
 import com.acp.chat.ui.chat.ChatScreen
 import com.acp.chat.ui.qr.QRScannerScreen
@@ -23,6 +24,9 @@ sealed class Screen(val route: String) {
     data object QRScanner : Screen("qr_scanner")
     data object Chat : Screen("chat/{agentId}") {
         fun createRoute(agentId: String) = "chat/$agentId"
+    }
+    data object AgentConfiguration : Screen("agent_config/{agentId}") {
+        fun createRoute(agentId: String) = "agent_config/$agentId"
     }
 }
 
@@ -50,6 +54,9 @@ class MainActivity : ComponentActivity() {
                                 },
                                 onNavigateToQRScanner = {
                                     navController.navigate(Screen.QRScanner.route)
+                                },
+                                onNavigateToAgentConfig = { agentId ->
+                                    navController.navigate(Screen.AgentConfiguration.createRoute(agentId))
                                 }
                             )
                         }
@@ -71,6 +78,17 @@ class MainActivity : ComponentActivity() {
                             )
                         ) {
                             ChatScreen(
+                                onNavigateBack = { navController.popBackStack() }
+                            )
+                        }
+
+                        composable(
+                            route = Screen.AgentConfiguration.route,
+                            arguments = listOf(
+                                navArgument("agentId") { type = NavType.StringType }
+                            )
+                        ) {
+                            AgentConfigurationScreen(
                                 onNavigateBack = { navController.popBackStack() }
                             )
                         }

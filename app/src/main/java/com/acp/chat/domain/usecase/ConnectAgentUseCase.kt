@@ -1,5 +1,6 @@
 package com.acp.chat.domain.usecase
 
+import android.util.Log
 import com.acp.chat.data.model.Agent
 import com.acp.chat.data.model.ConnectionConfig
 import com.acp.chat.data.model.ConnectionStatus
@@ -8,6 +9,8 @@ import com.acp.chat.domain.acp.ACPClient
 import kotlinx.serialization.json.Json
 import java.util.UUID
 import javax.inject.Inject
+
+private const val TAG = "ConnectAgentUseCase"
 
 class ConnectAgentUseCase @Inject constructor(
     private val agentRepository: AgentRepository,
@@ -34,6 +37,8 @@ class ConnectAgentUseCase @Inject constructor(
     /**
      * Connect to an agent using a pre-built ConnectionConfig.
      * Used by the pairing service after successful pairing.
+     * 
+     * If an agent with the same URL already exists, updates its credentials instead of creating a new one.
      */
     suspend fun connectWithConfig(config: ConnectionConfig): Result<Agent> {
         return try {
@@ -50,8 +55,26 @@ class ConnectAgentUseCase @Inject constructor(
             if (!isLocalhost && !hasAuth) {
                 return Result.failure(Exception("Authentication required for remote connections"))
             }
+            
+            // Check if agent already exists - if so, update credentials
+            val existingAgent = agentRepository.findAgentByUrl(config.url)
+            if (existingAgent != null) {
+                Log.d(TAG, "Agent exists for URL ${config.url}, updating credentials for ${existingAgent.id}")
+                agentRepository.updateAgentCredentials(existingAgent.id, config)
+                
+                // Attempt connection with new credentials
+                val connectResult = acpClient.connect(config)
+                if (connectResult.isFailure) {
+                    return Result.failure(connectResult.exceptionOrNull() ?: Exception("Connection failed after credential update"))
+                }
+                
+                // Update connection status
+                agentRepository.updateConnectionStatus(existingAgent.id, ConnectionStatus.CONNECTED)
+                
+                return Result.success(existingAgent.copy(connectionStatus = ConnectionStatus.CONNECTED))
+            }
 
-            // Attempt connection
+            // Attempt connection for new agent
             val connectResult = acpClient.connect(config)
             if (connectResult.isFailure) {
                 return Result.failure(connectResult.exceptionOrNull() ?: Exception("Connection failed"))

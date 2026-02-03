@@ -1,7 +1,9 @@
 package com.acp.chat.ui.agents
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -9,6 +11,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -29,6 +32,7 @@ import java.util.*
 fun AgentListScreen(
     onNavigateToChat: (String) -> Unit,
     onNavigateToQRScanner: () -> Unit,
+    onNavigateToAgentConfig: (String) -> Unit,
     viewModel: AgentListViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -66,6 +70,7 @@ fun AgentListScreen(
                         AgentItem(
                             agent = agent,
                             onClick = { onNavigateToChat(agent.id) },
+                            onConfigure = { onNavigateToAgentConfig(agent.id) },
                             onDelete = { agentToDelete = agent }
                         )
                     }
@@ -141,66 +146,106 @@ private fun EmptyAgentsView(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun AgentItem(
     agent: Agent,
     onClick: () -> Unit,
+    onConfigure: () -> Unit,
     onDelete: () -> Unit
 ) {
+    var showDropdownMenu by remember { mutableStateOf(false) }
+    
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = { showDropdownMenu = true }
+            )
     ) {
-        Row(
-            modifier = Modifier
-                .padding(16.dp)
-                .fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Avatar
-            Box(
+        Box {
+            Row(
                 modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .background(Color.hsv(agent.colorHue.mod(360f), 0.5f, 0.8f)),
-                contentAlignment = Alignment.Center
+                    .padding(16.dp)
+                    .fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = agent.name.take(1).uppercase(),
-                    style = MaterialTheme.typography.titleLarge,
-                    color = Color.White
-                )
-            }
+                // Avatar
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .background(Color.hsv(agent.colorHue.mod(360f), 0.5f, 0.8f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = agent.name.take(1).uppercase(),
+                        style = MaterialTheme.typography.titleLarge,
+                        color = Color.White
+                    )
+                }
 
-            // Agent info
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = agent.name,
-                    style = MaterialTheme.typography.titleMedium
-                )
-                Text(
-                    text = when (agent.connectionStatus) {
-                        ConnectionStatus.CONNECTED -> stringResource(R.string.agent_connected)
-                        ConnectionStatus.DISCONNECTED -> stringResource(R.string.agent_disconnected)
-                        ConnectionStatus.RECONNECTING -> stringResource(R.string.agent_reconnecting)
+                // Agent info
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = agent.name,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Text(
+                        text = when (agent.connectionStatus) {
+                            ConnectionStatus.CONNECTED -> stringResource(R.string.agent_connected)
+                            ConnectionStatus.DISCONNECTED -> stringResource(R.string.agent_disconnected)
+                            ConnectionStatus.RECONNECTING -> stringResource(R.string.agent_reconnecting)
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = when (agent.connectionStatus) {
+                            ConnectionStatus.CONNECTED -> Color(0xFF4CAF50)
+                            ConnectionStatus.DISCONNECTED -> Color(0xFF9E9E9E)
+                            ConnectionStatus.RECONNECTING -> Color(0xFFFFA726)
+                        }
+                    )
+                }
+
+                // Settings button
+                IconButton(onClick = onConfigure) {
+                    Icon(
+                        imageVector = Icons.Default.Settings,
+                        contentDescription = stringResource(R.string.configure_agent),
+                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                }
+            }
+            
+            // Long-press dropdown menu
+            DropdownMenu(
+                expanded = showDropdownMenu,
+                onDismissRequest = { showDropdownMenu = false }
+            ) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.configure_agent)) },
+                    onClick = {
+                        showDropdownMenu = false
+                        onConfigure()
                     },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = when (agent.connectionStatus) {
-                        ConnectionStatus.CONNECTED -> Color(0xFF4CAF50)
-                        ConnectionStatus.DISCONNECTED -> Color(0xFF9E9E9E)
-                        ConnectionStatus.RECONNECTING -> Color(0xFFFFA726)
+                    leadingIcon = {
+                        Icon(Icons.Default.Settings, contentDescription = null)
                     }
                 )
-            }
-
-            // Delete button
-            IconButton(onClick = onDelete) {
-                Icon(
-                    imageVector = Icons.Default.Delete,
-                    contentDescription = "Delete agent",
-                    tint = MaterialTheme.colorScheme.error
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.delete)) },
+                    onClick = {
+                        showDropdownMenu = false
+                        onDelete()
+                    },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                    }
                 )
             }
         }

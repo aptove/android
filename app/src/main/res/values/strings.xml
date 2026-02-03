@@ -49,4 +49,37 @@
     <string name="notification_channel_name">Agent Connections</string>
     <string name="notification_channel_description">Notifications for active agent connections</string>
     <string name="notification_active_connections">%1$d active agent connection(s)</string>
+    
+    <!-- Agent Configuration Screen -->
+    <string name="agent_configuration_title">Agent Configuration</string>
+    <string name="back">Back</string>
+    <string name="agent_not_found">Agent not found</string>
+    <string name="agent_info_title">Agent Information</string>
+    <string name="name_label">Name</string>
+    <string name="url_label">URL</string>
+    <string name="status_label">Status</string>
+    <string name="protocol_version_label">Protocol</string>
+    <string name="last_connected_label">Last Connected</string>
+    <string name="session_info_title">Session Information</string>
+    <string name="session_id_label">Session ID</string>
+    <string name="session_started_label">Started</string>
+    <string name="message_count_label">Messages</string>
+    <string name="supports_resume_label">Supports Resume</string>
+    <string name="yes">Yes</string>
+    <string name="no">No</string>
+    <string name="no_active_session">No active session</string>
+    <string name="actions_title">Actions</string>
+    <string name="clear_session_button">Clear Session</string>
+    <string name="clear_session_description">Start a fresh conversation. All messages will be deleted.</string>
+    <string name="clear_session_title">Clear Session?</string>
+    <string name="clear_session_message">This will delete all conversation history and start a fresh session. This cannot be undone.</string>
+    <string name="clear">Clear</string>
+    <string name="delete_agent_button">Delete Agent</string>
+    <string name="delete_agent_description">Remove this agent and all associated data permanently.</string>
+    <string name="delete_agent_title">Delete Agent?</string>
+    <string name="delete_agent_message">Are you sure you want to delete "%1$s"? This will remove all conversation history.</string>
+    <string name="delete">Delete</string>
+    <string name="error">Error</string>
+    <string name="ok">OK</string>
+    <string name="configure_agent">Configure Agent</string>
 </resources>
