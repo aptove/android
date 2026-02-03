@@ -116,6 +116,40 @@ After successful pairing, the app receives WebSocket credentials securely.
 - **Certificate Pinning**: Validates TLS certificate fingerprint from QR code
 - **Secure Pairing**: One-time codes with 60-second expiry and rate limiting
 
+## Session Persistence
+
+The app supports automatic session resumption when reconnecting to agents:
+
+### How It Works
+
+1. **Session Storage**: When a new session is created, the session ID and start time are stored locally.
+2. **Capability Detection**: The app checks if the agent supports `loadSession` capability during initialization.
+3. **Auto-Resume**: When reconnecting, the app attempts to load the existing session if the agent supports it.
+4. **Graceful Fallback**: If session loading fails (e.g., session expired), a new session is created automatically.
+
+### Session Status Indicators
+
+When entering a chat:
+- **"Session resumed"** (blue text) - Successfully loaded an existing session
+- **"New session"** (gray text) - Created a fresh session
+
+### Agent Configuration Screen
+
+Long-press an agent in the list to access the configuration screen where you can:
+- View agent information (name, URL, protocol version)
+- View session information (ID, start time, message count)
+- **Clear Session** - Start a fresh conversation (deletes all messages)
+- **Delete Agent** - Remove the agent and all associated data
+
+### QR Re-scan Behavior
+
+If you scan a QR code for an agent that already exists:
+- The app updates the stored credentials (auth token, certificate fingerprint)
+- The cached session is cleared
+- A connection test is performed with the new credentials
+
+This is useful when the bridge restarts and generates new credentials.
+
 ## ACP Protocol Implementation
 
 The app uses the official ACP Kotlin SDK:
