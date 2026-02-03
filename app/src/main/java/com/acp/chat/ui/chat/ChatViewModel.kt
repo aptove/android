@@ -252,8 +252,8 @@ class ChatViewModel @Inject constructor(
 
     override fun onCleared() {
         super.onCleared()
-        viewModelScope.launch {
-            agentRepository.disconnectFromAgent(agentId)
-        }
+        // Don't disconnect when leaving chat screen - keep the session alive
+        // The connection will be reused when the user returns to this chat
+        // Disconnect only happens when user explicitly requests it (e.g., swipe action on agent list)
     }
 }

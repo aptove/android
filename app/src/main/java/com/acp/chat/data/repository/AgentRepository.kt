@@ -1,5 +1,6 @@
 package com.acp.chat.data.repository
 
+import android.util.Log
 import com.acp.chat.data.local.AgentDao
 import com.acp.chat.data.local.CredentialStorage
 import com.acp.chat.data.model.Agent
@@ -7,6 +8,7 @@ import com.acp.chat.data.model.ConnectionConfig
 import com.acp.chat.data.model.ConnectionStatus
 import com.acp.chat.domain.acp.ACPClient
 import com.agentclientprotocol.client.ClientSession
+import com.agentclientprotocol.model.SessionId
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -19,6 +21,10 @@ class AgentRepository @Inject constructor(
 ) {
     
     private val sessionCache = mutableMapOf<String, ClientSession>()
+    
+    companion object {
+        private const val TAG = "AgentRepository"
+    }
     
     fun getAllAgents(): Flow<List<Agent>> = agentDao.getAllAgents()
 
@@ -59,8 +65,19 @@ class AgentRepository @Inject constructor(
     }
 
     suspend fun connectToAgent(agentId: String): Result<ClientSession> {
+        // Check if we already have a cached session - reuse it!
+        val existingSession = sessionCache[agentId]
+        if (existingSession != null) {
+            Log.d(TAG, "✅ connectToAgent: Reusing cached session for agent $agentId")
+            updateConnectionStatus(agentId, ConnectionStatus.CONNECTED)
+            return Result.success(existingSession)
+        }
+        
         val config = credentialStorage.getCredentials(agentId)
             ?: return Result.failure(Exception("No credentials found"))
+        
+        val agent = agentDao.getAgentById(agentId)
+        Log.d(TAG, "🔄 connectToAgent: agentId=$agentId, storedSessionId=${agent?.activeSessionId}, storedSupportsLoad=${agent?.supportsLoadSession}")
 
         updateConnectionStatus(agentId, ConnectionStatus.RECONNECTING)
 
@@ -68,22 +85,85 @@ class AgentRepository @Inject constructor(
             // Connect to agent
             acpClient.connect(config)
             
-            // Create session
-            val sessionResult = acpClient.createSession()
-            if (sessionResult.isFailure) {
-                updateConnectionStatus(agentId, ConnectionStatus.DISCONNECTED)
-                return Result.failure(sessionResult.exceptionOrNull() ?: Exception("Failed to create session"))
+            // Check if we have a stored session and agent supports loading
+            val storedSessionId = agent?.activeSessionId
+            val supportsLoad = acpClient.supportsLoadSession()
+            
+            Log.d(TAG, "Connecting to agent: $agentId, stored session: $storedSessionId, supports load: $supportsLoad")
+            
+            val session: ClientSession
+            
+            if (storedSessionId != null && supportsLoad) {
+                // Try to load existing session
+                Log.d(TAG, "Attempting to load session: $storedSessionId")
+                val loadResult = acpClient.loadSession(SessionId(storedSessionId))
+                
+                if (loadResult.isSuccess) {
+                    Log.d(TAG, "Successfully loaded session: $storedSessionId")
+                    session = loadResult.getOrThrow()
+                } else {
+                    // Session load failed, create new session
+                    Log.d(TAG, "Failed to load session, creating new: ${loadResult.exceptionOrNull()?.message}")
+                    clearSessionInfo(agentId)
+                    
+                    val createResult = acpClient.createSession()
+                    if (createResult.isFailure) {
+                        updateConnectionStatus(agentId, ConnectionStatus.DISCONNECTED)
+                        return Result.failure(createResult.exceptionOrNull() ?: Exception("Failed to create session"))
+                    }
+                    session = createResult.getOrThrow()
+                    
+                    // Store new session info
+                    updateSessionInfo(agentId, session.sessionId.value, supportsLoad)
+                }
+            } else {
+                // Create new session
+                val sessionResult = acpClient.createSession()
+                if (sessionResult.isFailure) {
+                    updateConnectionStatus(agentId, ConnectionStatus.DISCONNECTED)
+                    return Result.failure(sessionResult.exceptionOrNull() ?: Exception("Failed to create session"))
+                }
+                
+                session = sessionResult.getOrThrow()
+                
+                // Store session info for future resumption
+                updateSessionInfo(agentId, session.sessionId.value, supportsLoad)
             }
             
-            val session = sessionResult.getOrThrow()
             sessionCache[agentId] = session
             
             updateConnectionStatus(agentId, ConnectionStatus.CONNECTED)
             Result.success(session)
         } catch (e: Exception) {
+            Log.e(TAG, "Connection failed", e)
             updateConnectionStatus(agentId, ConnectionStatus.DISCONNECTED)
             Result.failure(e)
         }
+    }
+    
+    /**
+     * Update the stored session information for an agent
+     */
+    private suspend fun updateSessionInfo(agentId: String, sessionId: String, supportsLoad: Boolean) {
+        Log.d(TAG, "📝 Storing session info for agent $agentId: sessionId=$sessionId, supportsLoad=$supportsLoad")
+        agentDao.updateSessionInfo(
+            agentId = agentId,
+            sessionId = sessionId,
+            startedAt = System.currentTimeMillis(),
+            supportsLoad = supportsLoad
+        )
+        // Verify the update
+        val updated = agentDao.getAgentById(agentId)
+        Log.d(TAG, "📝 Verified stored session: activeSessionId=${updated?.activeSessionId}, supportsLoadSession=${updated?.supportsLoadSession}")
+    }
+    
+    /**
+     * Clear the session information for an agent (used when session expires or user clears)
+     */
+    suspend fun clearSessionInfo(agentId: String) {
+        Log.d(TAG, "Clearing session info for agent: $agentId")
+        agentDao.clearSessionInfo(agentId)
+        sessionCache.remove(agentId)
     }
 
     suspend fun disconnectFromAgent(agentId: String) {

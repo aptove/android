@@ -22,5 +22,9 @@ data class Agent(
     val connectionStatus: ConnectionStatus = ConnectionStatus.DISCONNECTED,
     val lastConnectedAt: Long? = null,
     val createdAt: Long = System.currentTimeMillis(),
-    val colorHue: Float = (id.hashCode().toFloat().mod(360f))
+    val colorHue: Float = (id.hashCode().toFloat().mod(360f)),
+    // Session persistence fields
+    val activeSessionId: String? = null,
+    val sessionStartedAt: Long? = null,
+    val supportsLoadSession: Boolean = false
 )

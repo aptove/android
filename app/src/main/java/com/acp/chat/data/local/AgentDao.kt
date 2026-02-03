@@ -39,4 +39,15 @@ interface AgentDao {
         status: ConnectionStatus,
         timestamp: Long
     )
+
+    @Query("UPDATE agents SET activeSessionId = :sessionId, sessionStartedAt = :startedAt, supportsLoadSession = :supportsLoad WHERE id = :agentId")
+    suspend fun updateSessionInfo(
+        agentId: String,
+        sessionId: String?,
+        startedAt: Long?,
+        supportsLoad: Boolean
+    )
+
+    @Query("UPDATE agents SET activeSessionId = NULL, sessionStartedAt = NULL WHERE id = :agentId")
+    suspend fun clearSessionInfo(agentId: String)
 }

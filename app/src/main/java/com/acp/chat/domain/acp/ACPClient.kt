@@ -45,6 +45,7 @@ class ACPClient @Inject constructor() {
     private var protocol: Protocol? = null
     private var client: Client? = null
     private var currentConfig: ConnectionConfig? = null
+    private var agentCapabilities: AgentCapabilities? = null
     
     private val _connectionState = MutableStateFlow<ACPConnectionState>(ACPConnectionState.Disconnected)
     val connectionState: StateFlow<ACPConnectionState> = _connectionState.asStateFlow()
@@ -181,6 +182,10 @@ class ACPClient @Inject constructor() {
                     )
                 )
             )
+            
+            // Store agent capabilities for later use
+            agentCapabilities = agentInfo.capabilities
+            Log.d("ACPClient", "🔧 Agent capabilities: loadSession=${agentInfo.capabilities.loadSession}, sessionCapabilities=${agentInfo.capabilities.sessionCapabilities}")
 
             _connectionState.value = ACPConnectionState.Connected(agentInfo, "")
 
@@ -226,77 +231,7 @@ class ACPClient @Inject constructor() {
             val currentClient = client ?: throw Exception("Not connected")
             
             // Create operations factory with tool approval support
-            val operationsFactory = ClientOperationsFactory { sessionId, sessionResponse ->
-                object : com.agentclientprotocol.common.ClientSessionOperations,
-                         com.agentclientprotocol.common.TerminalOperations {
-                    
-                    override suspend fun requestPermissions(
-                        toolCall: SessionUpdate.ToolCallUpdate,
-                        permissions: List<PermissionOption>,
-                        _meta: JsonElement?
-                    ): RequestPermissionResponse = suspendCancellableCoroutine { continuation ->
-                        val requestId = toolCall.toolCallId.value
-                        pendingApprovals[requestId] = continuation
-                        
-                        // Notify UI on main thread
-                        scope.launch(Dispatchers.Main) {
-                            onToolApprovalRequest?.invoke(
-                                requestId,
-                                toolCall.title ?: "Tool Approval Required",
-                                null,
-                                permissions
-                            )
-                        }
-                    }
-                    
-                    override suspend fun terminalCreate(
-                        command: String,
-                        args: List<String>,
-                        cwd: String?,
-                        env: List<EnvVariable>,
-                        outputByteLimit: ULong?,
-                        _meta: JsonElement?
-                    ): CreateTerminalResponse {
-                        val fullCommand = "$command ${args.joinToString(" ")}"
-                        
-                        // For now, approve terminal commands automatically
-                        // In a real implementation, this would wait for user approval
-                        return CreateTerminalResponse(java.util.UUID.randomUUID().toString())
-                    }
-                    
-                    override suspend fun terminalOutput(
-                        terminalId: String,
-                        _meta: JsonElement?
-                    ): TerminalOutputResponse {
-                        return TerminalOutputResponse("", truncated = false)
-                    }
-                    
-                    override suspend fun terminalRelease(
-                        terminalId: String,
-                        _meta: JsonElement?
-                    ): ReleaseTerminalResponse {
-                        return ReleaseTerminalResponse()
-                    }
-                    
-                    override suspend fun terminalWaitForExit(
-                        terminalId: String,
-                        _meta: JsonElement?
-                    ): WaitForTerminalExitResponse {
-                        return WaitForTerminalExitResponse(0u)
-                    }
-                    
-                    override suspend fun terminalKill(
-                        terminalId: String,
-                        _meta: JsonElement?
-                    ): KillTerminalCommandResponse {
-                        return KillTerminalCommandResponse()
-                    }
-                    
-                    override suspend fun notify(notification: SessionUpdate, _meta: JsonElement?) {
-                        // Handle notifications if needed
-                    }
-                }
-            }
+            val operationsFactory = createOperationsFactory()
             
             val session = currentClient.newSession(
                 SessionCreationParameters(
@@ -309,6 +244,118 @@ class ACPClient @Inject constructor() {
             Result.success(session)
         } catch (e: Exception) {
             Result.failure(e)
+        }
+    }
+    
+    /**
+     * Load an existing session by ID. Only works if the agent supports loadSession capability.
+     */
+    suspend fun loadSession(sessionId: SessionId): Result<ClientSession> = withContext(Dispatchers.IO) {
+        try {
+            val currentClient = client ?: throw Exception("Not connected")
+            
+            // Check if agent supports loadSession
+            if (agentCapabilities?.loadSession != true) {
+                return@withContext Result.failure(Exception("Agent does not support loadSession"))
+            }
+            
+            // Create operations factory with tool approval support
+            val operationsFactory = createOperationsFactory()
+            
+            val session = currentClient.loadSession(
+                sessionId = sessionId,
+                sessionParameters = SessionCreationParameters(
+                    cwd = "/tmp",
+                    mcpServers = emptyList()
+                ),
+                operationsFactory = operationsFactory
+            )
+            
+            Result.success(session)
+        } catch (e: Exception) {
+            Log.e("ACPClient", "Failed to load session: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+    
+    /**
+     * Check if the agent supports loading sessions
+     */
+    fun supportsLoadSession(): Boolean {
+        return agentCapabilities?.loadSession == true
+    }
+    
+    private fun createOperationsFactory(): ClientOperationsFactory {
+        return ClientOperationsFactory { sessionId, sessionResponse ->
+            object : com.agentclientprotocol.common.ClientSessionOperations,
+                     com.agentclientprotocol.common.TerminalOperations {
+                
+                override suspend fun requestPermissions(
+                    toolCall: SessionUpdate.ToolCallUpdate,
+                    permissions: List<PermissionOption>,
+                    _meta: JsonElement?
+                ): RequestPermissionResponse = suspendCancellableCoroutine { continuation ->
+                    val requestId = toolCall.toolCallId.value
+                    pendingApprovals[requestId] = continuation
+                    
+                    // Notify UI on main thread
+                    scope.launch(Dispatchers.Main) {
+                        onToolApprovalRequest?.invoke(
+                            requestId,
+                            toolCall.title ?: "Tool Approval Required",
+                            null,
+                            permissions
+                        )
+                    }
+                }
+                
+                override suspend fun terminalCreate(
+                    command: String,
+                    args: List<String>,
+                    cwd: String?,
+                    env: List<EnvVariable>,
+                    outputByteLimit: ULong?,
+                    _meta: JsonElement?
+                ): CreateTerminalResponse {
+                    val fullCommand = "$command ${args.joinToString(" ")}"
+                    
+                    // For now, approve terminal commands automatically
+                    // In a real implementation, this would wait for user approval
+                    return CreateTerminalResponse(java.util.UUID.randomUUID().toString())
+                }
+                
+                override suspend fun terminalOutput(
+                    terminalId: String,
+                    _meta: JsonElement?
+                ): TerminalOutputResponse {
+                    return TerminalOutputResponse("", truncated = false)
+                }
+                
+                override suspend fun terminalRelease(
+                    terminalId: String,
+                    _meta: JsonElement?
+                ): ReleaseTerminalResponse {
+                    return ReleaseTerminalResponse()
+                }
+                
+                override suspend fun terminalWaitForExit(
+                    terminalId: String,
+                    _meta: JsonElement?
+                ): WaitForTerminalExitResponse {
+                    return WaitForTerminalExitResponse(0u)
+                }
+                
+                override suspend fun terminalKill(
+                    terminalId: String,
+                    _meta: JsonElement?
+                ): KillTerminalCommandResponse {
+                    return KillTerminalCommandResponse()
+                }
+                
+                override suspend fun notify(notification: SessionUpdate, _meta: JsonElement?) {
+                    // Handle notifications if needed
+                }
+            }
         }
     }
 
