@@ -25,7 +25,9 @@ data class ChatUiState(
     val isSending: Boolean = false,
     val error: String? = null,
     val session: ClientSession? = null,
-    val pendingApprovalOptions: Map<String, List<PermissionOptionInfo>> = emptyMap()
+    val pendingApprovalOptions: Map<String, List<PermissionOptionInfo>> = emptyMap(),
+    val sessionResumed: Boolean? = null, // null = unknown, true = resumed, false = new
+    val showSessionIndicator: Boolean = false
 )
 
 @HiltViewModel
@@ -114,11 +116,26 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             val result = agentRepository.connectToAgent(agentId)
             if (result.isSuccess) {
-                val session = result.getOrNull()
-                _uiState.update { it.copy(session = session) }
+                val connectionResult = result.getOrNull()!!
+                val session = connectionResult.session
+                val wasResumed = connectionResult.wasResumed
+                
+                _uiState.update { 
+                    it.copy(
+                        session = session,
+                        sessionResumed = wasResumed,
+                        showSessionIndicator = true
+                    )
+                }
+                
+                // Hide session indicator after 3 seconds
+                kotlinx.coroutines.delay(3000)
+                _uiState.update { it.copy(showSessionIndicator = false) }
                 
                 // Send conversation history to the agent for context
-                session?.let { sendConversationHistory(it) }
+                if (!wasResumed) {
+                    sendConversationHistory(session)
+                }
             } else {
                 _uiState.update { it.copy(error = "Failed to connect: ${result.exceptionOrNull()?.message}") }
             }

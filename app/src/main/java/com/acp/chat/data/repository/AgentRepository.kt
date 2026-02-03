@@ -13,6 +13,14 @@ import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/**
+ * Result of connecting to an agent, includes session and whether it was resumed
+ */
+data class ConnectionResult(
+    val session: ClientSession,
+    val wasResumed: Boolean
+)
+
 @Singleton
 class AgentRepository @Inject constructor(
     private val agentDao: AgentDao,
@@ -96,13 +104,13 @@ class AgentRepository @Inject constructor(
         return credentialStorage.getCredentials(agentId)
     }
 
-    suspend fun connectToAgent(agentId: String): Result<ClientSession> {
+    suspend fun connectToAgent(agentId: String): Result<ConnectionResult> {
         // Check if we already have a cached session - reuse it!
         val existingSession = sessionCache[agentId]
         if (existingSession != null) {
             Log.d(TAG, "✅ connectToAgent: Reusing cached session for agent $agentId")
             updateConnectionStatus(agentId, ConnectionStatus.CONNECTED)
-            return Result.success(existingSession)
+            return Result.success(ConnectionResult(existingSession, wasResumed = true))
         }
         
         val config = credentialStorage.getCredentials(agentId)
@@ -124,6 +132,7 @@ class AgentRepository @Inject constructor(
             Log.d(TAG, "Connecting to agent: $agentId, stored session: $storedSessionId, supports load: $supportsLoad")
             
             val session: ClientSession
+            var wasResumed = false
             
             if (storedSessionId != null && supportsLoad) {
                 // Try to load existing session
@@ -133,6 +142,7 @@ class AgentRepository @Inject constructor(
                 if (loadResult.isSuccess) {
                     Log.d(TAG, "Successfully loaded session: $storedSessionId")
                     session = loadResult.getOrThrow()
+                    wasResumed = true
                 } else {
                     // Session load failed, create new session
                     Log.d(TAG, "Failed to load session, creating new: ${loadResult.exceptionOrNull()?.message}")
@@ -144,6 +154,7 @@ class AgentRepository @Inject constructor(
                         return Result.failure(createResult.exceptionOrNull() ?: Exception("Failed to create session"))
                     }
                     session = createResult.getOrThrow()
+                    wasResumed = false
                     
                     // Store new session info
                     updateSessionInfo(agentId, session.sessionId.value, supportsLoad)
@@ -157,6 +168,7 @@ class AgentRepository @Inject constructor(
                 }
                 
                 session = sessionResult.getOrThrow()
+                wasResumed = false
                 
                 // Store session info for future resumption
                 updateSessionInfo(agentId, session.sessionId.value, supportsLoad)
@@ -165,7 +177,7 @@ class AgentRepository @Inject constructor(
             sessionCache[agentId] = session
             
             updateConnectionStatus(agentId, ConnectionStatus.CONNECTED)
-            Result.success(session)
+            Result.success(ConnectionResult(session, wasResumed))
         } catch (e: Exception) {
             Log.e(TAG, "Connection failed", e)
             updateConnectionStatus(agentId, ConnectionStatus.DISCONNECTED)

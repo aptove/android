@@ -48,7 +48,29 @@ fun ChatScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(uiState.agent?.name ?: stringResource(R.string.chat_title)) },
+                title = { 
+                    Column {
+                        Text(uiState.agent?.name ?: stringResource(R.string.chat_title))
+                        // Show session status indicator
+                        if (uiState.showSessionIndicator) {
+                            val statusText = when (uiState.sessionResumed) {
+                                true -> stringResource(R.string.session_resumed)
+                                false -> stringResource(R.string.session_new)
+                                null -> ""
+                            }
+                            if (statusText.isNotEmpty()) {
+                                Text(
+                                    text = statusText,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (uiState.sessionResumed == true) 
+                                        MaterialTheme.colorScheme.primary 
+                                    else 
+                                        MaterialTheme.colorScheme.secondary
+                                )
+                            }
+                        }
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
