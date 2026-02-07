@@ -12,6 +12,8 @@ import com.agentclientprotocol.common.SessionCreationParameters
 import com.agentclientprotocol.model.*
 import com.agentclientprotocol.protocol.Protocol
 import com.agentclientprotocol.protocol.ProtocolOptions
+import com.agentclientprotocol.rpc.JsonRpcNotification
+import com.agentclientprotocol.rpc.MethodName
 import com.agentclientprotocol.transport.acpProtocolOnClientWebSocket
 import io.ktor.client.*
 import io.ktor.client.engine.okhttp.*
@@ -454,6 +456,47 @@ class ACPClient @Inject constructor() {
         } else {
             android.util.Log.w("ACPClient", "⚠️ No pending rejection found for toolCallId: $toolCallId")
         }
+    }
+
+    /**
+     * Send a bridge-specific JSON-RPC notification (not part of ACP protocol).
+     * Used for push token registration with the bridge relay.
+     * The serializer is unused in sendNotificationRaw (it only extracts methodName),
+     * so the unchecked cast is safe.
+     */
+    @Suppress("UNCHECKED_CAST")
+    private fun sendBridgeNotification(method: String, params: kotlinx.serialization.json.JsonElement) {
+        val proto = protocol ?: return
+        try {
+            val dummySerializer = CancelRequestNotification.serializer() as kotlinx.serialization.KSerializer<AcpNotification>
+            val bridgeMethod = AcpMethod.AcpNotificationMethod(method, dummySerializer)
+            proto.sendNotificationRaw(bridgeMethod, params)
+            Log.d("ACPClient", "📲 Bridge notification sent: $method")
+        } catch (e: Exception) {
+            Log.e("ACPClient", "Failed to send bridge notification: ${e.message}", e)
+        }
+    }
+
+    /**
+     * Register an FCM push token with the bridge for background notifications
+     */
+    fun registerPushToken(deviceToken: String, bundleId: String = "com.acp.chat") {
+        val params = kotlinx.serialization.json.buildJsonObject {
+            put("platform", kotlinx.serialization.json.JsonPrimitive("fcm"))
+            put("deviceToken", kotlinx.serialization.json.JsonPrimitive(deviceToken))
+            put("bundleId", kotlinx.serialization.json.JsonPrimitive(bundleId))
+        }
+        sendBridgeNotification("bridge/registerPushToken", params)
+    }
+
+    /**
+     * Unregister an FCM push token from the bridge
+     */
+    fun unregisterPushToken(deviceToken: String) {
+        val params = kotlinx.serialization.json.buildJsonObject {
+            put("deviceToken", kotlinx.serialization.json.JsonPrimitive(deviceToken))
+        }
+        sendBridgeNotification("bridge/unregisterPushToken", params)
     }
 
     suspend fun disconnect() {

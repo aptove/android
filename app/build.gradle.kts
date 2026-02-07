@@ -4,6 +4,7 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
     id("com.google.devtools.ksp")
     id("com.google.dagger.hilt.android")
+    id("com.google.gms.google-services")
     kotlin("plugin.serialization") version "2.0.0"
 }
 
@@ -118,6 +119,10 @@ dependencies {
     
     // Ktor client engine for Android  
     implementation("io.ktor:ktor-client-okhttp:3.0.2")
+
+    // Firebase Cloud Messaging for push notifications
+    implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
+    implementation("com.google.firebase:firebase-messaging-ktx")
 
     // QR Code Scanning (ML Kit - better accuracy than ZXing)
     implementation("com.google.mlkit:barcode-scanning:17.2.0")

@@ -1,5 +1,6 @@
 package com.acp.chat.data.repository
 
+import android.content.Context
 import android.util.Log
 import com.acp.chat.data.local.AgentDao
 import com.acp.chat.data.local.CredentialStorage
@@ -7,8 +8,10 @@ import com.acp.chat.data.model.Agent
 import com.acp.chat.data.model.ConnectionConfig
 import com.acp.chat.data.model.ConnectionStatus
 import com.acp.chat.domain.acp.ACPClient
+import com.acp.chat.service.PushTokenManager
 import com.agentclientprotocol.client.ClientSession
 import com.agentclientprotocol.model.SessionId
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -23,6 +26,7 @@ data class ConnectionResult(
 
 @Singleton
 class AgentRepository @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val agentDao: AgentDao,
     private val credentialStorage: CredentialStorage,
     private val acpClient: ACPClient
@@ -175,6 +179,12 @@ class AgentRepository @Inject constructor(
             }
             
             sessionCache[agentId] = session
+            
+            // Register FCM push token with bridge for background notifications
+            PushTokenManager.getToken(context)?.let { fcmToken ->
+                Log.d(TAG, "📲 Registering FCM push token with bridge")
+                acpClient.registerPushToken(fcmToken)
+            }
             
             updateConnectionStatus(agentId, ConnectionStatus.CONNECTED)
             Result.success(ConnectionResult(session, wasResumed))
