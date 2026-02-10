@@ -56,6 +56,18 @@ class ACPClient @Inject constructor() {
     private val pendingApprovals = mutableMapOf<String, CancellableContinuation<RequestPermissionResponse>>()
     var onToolApprovalRequest: ((String, String, String?, List<PermissionOption>) -> Unit)? = null
 
+    /**
+     * Maximum number of reconnect-and-retry attempts when sendMessage fails
+     * due to a transport error (e.g. dead WebSocket). Default is 1.
+     */
+    var maxReconnectAttempts: Int = 1
+
+    /**
+     * Callback invoked after a successful reconnect during sendMessage retry.
+     * Receives the new ClientSession so callers can update their references.
+     */
+    var onSessionRefreshed: ((ClientSession) -> Unit)? = null
+
     private var reconnectJob: Job? = null
     private var reconnectAttempt = 0
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -362,70 +374,142 @@ class ACPClient @Inject constructor() {
     }
 
     suspend fun sendMessage(session: ClientSession, text: String): Flow<ACPMessage> = flow {
-        // Create content blocks from text
         val contentBlocks = listOf(
             ContentBlock.Text(text = text)
         )
 
-        // Send prompt and collect events
-        session.prompt(contentBlocks)
-            .collect { event ->
-                when (event) {
-                    is Event.SessionUpdateEvent -> {
-                        when (val update = event.update) {
-                            is SessionUpdate.AgentMessageChunk -> {
-                                // Extract text from ContentBlock
-                                val textContent = update.content
-                                when (textContent) {
-                                    is ContentBlock.Text -> {
-                                        emit(ACPMessage.TextChunk(textContent.text, isComplete = false))
+        var currentSession = session
+        var lastError: Throwable? = null
+
+        for (attempt in 0..maxReconnectAttempts) {
+            if (attempt > 0) {
+                // This is a retry — reconnect first
+                Log.d("ACPClient", "🔄 Reconnect attempt $attempt/$maxReconnectAttempts after error: ${lastError?.message}")
+                _connectionState.value = ACPConnectionState.Reconnecting
+
+                val config = currentConfig
+                if (config == null) {
+                    Log.e("ACPClient", "❌ Cannot reconnect: no saved config")
+                    emit(ACPMessage.Error("Connection lost and no config to reconnect"))
+                    return@flow
+                }
+
+                // Save session ID for resumption
+                val savedSessionId = currentSession.sessionId.value
+                Log.d("ACPClient", "🔄 Reconnecting with saved session ID: $savedSessionId")
+
+                // Tear down dead connection
+                protocol?.close()
+                protocol = null
+                client = null
+
+                // Re-establish connection
+                val connectResult = connect(config)
+                if (connectResult.isFailure) {
+                    Log.e("ACPClient", "❌ Reconnect failed: ${connectResult.exceptionOrNull()?.message}")
+                    _connectionState.value = ACPConnectionState.Error(
+                        message = "Reconnection failed: ${connectResult.exceptionOrNull()?.message}",
+                        cause = connectResult.exceptionOrNull()
+                    )
+                    emit(ACPMessage.Error("Reconnection failed: ${connectResult.exceptionOrNull()?.message}"))
+                    return@flow
+                }
+
+                // Re-establish session (try load first, fall back to create)
+                val sessionResult = if (agentCapabilities?.loadSession == true) {
+                    Log.d("ACPClient", "🔄 Attempting to load session: $savedSessionId")
+                    val loadResult = loadSession(SessionId(savedSessionId))
+                    if (loadResult.isSuccess) {
+                        Log.d("ACPClient", "✅ Session loaded successfully")
+                        loadResult
+                    } else {
+                        Log.d("ACPClient", "⚠️ Session load failed, creating new session")
+                        createSession()
+                    }
+                } else {
+                    createSession()
+                }
+
+                if (sessionResult.isFailure) {
+                    Log.e("ACPClient", "❌ Session recreation failed: ${sessionResult.exceptionOrNull()?.message}")
+                    emit(ACPMessage.Error("Failed to restore session: ${sessionResult.exceptionOrNull()?.message}"))
+                    return@flow
+                }
+
+                currentSession = sessionResult.getOrThrow()
+                Log.d("ACPClient", "✅ Reconnected with session: ${currentSession.sessionId.value}")
+
+                // Notify callers about the new session
+                onSessionRefreshed?.invoke(currentSession)
+            }
+
+            // Attempt to send the prompt
+            try {
+                currentSession.prompt(contentBlocks)
+                    .collect { event ->
+                        when (event) {
+                            is Event.SessionUpdateEvent -> {
+                                when (val update = event.update) {
+                                    is SessionUpdate.AgentMessageChunk -> {
+                                        val textContent = update.content
+                                        when (textContent) {
+                                            is ContentBlock.Text -> {
+                                                emit(ACPMessage.TextChunk(textContent.text, isComplete = false))
+                                            }
+                                            else -> { /* Handle other content types if needed */ }
+                                        }
                                     }
-                                    else -> {
-                                        // Handle other content types if needed
+                                    is SessionUpdate.AgentThoughtChunk -> {
+                                        // Could handle thought display
                                     }
+                                    is SessionUpdate.ToolCall -> {
+                                        val toolInfo = buildString {
+                                            append("🔧 **${update.title}**\n")
+                                            append("Status: ${update.status?.name ?: "started"}\n")
+                                            update.rawInput?.let {
+                                                append("\n📥 Input:\n```json\n$it\n```\n")
+                                            }
+                                            update.rawOutput?.let {
+                                                append("\n📤 Output:\n```json\n$it\n```\n")
+                                            }
+                                        }
+                                        emit(ACPMessage.TextChunk(toolInfo, isComplete = false))
+                                    }
+                                    is SessionUpdate.ToolCallUpdate -> {
+                                        val toolInfo = buildString {
+                                            append("🔧 **${update.title ?: "Tool"}** - ${update.status?.name ?: "updated"}\n")
+                                            update.rawInput?.let {
+                                                append("\n📥 Input:\n```json\n$it\n```\n")
+                                            }
+                                            update.rawOutput?.let {
+                                                append("\n📤 Output:\n```json\n$it\n```\n")
+                                            }
+                                        }
+                                        emit(ACPMessage.TextChunk(toolInfo, isComplete = false))
+                                    }
+                                    else -> { /* Handle other update types */ }
                                 }
                             }
-                            is SessionUpdate.AgentThoughtChunk -> {
-                                // Could handle thought display
-                            }
-                            is SessionUpdate.ToolCall -> {
-                                // New tool call initiated
-                                val toolInfo = buildString {
-                                    append("🔧 **${update.title}**\n")
-                                    append("Status: ${update.status?.name ?: "started"}\n")
-                                    update.rawInput?.let {
-                                        append("\n📥 Input:\n```json\n$it\n```\n")
-                                    }
-                                    update.rawOutput?.let {
-                                        append("\n📤 Output:\n```json\n$it\n```\n")
-                                    }
-                                }
-                                emit(ACPMessage.TextChunk(toolInfo, isComplete = false))
-                            }
-                            is SessionUpdate.ToolCallUpdate -> {
-                                // Tool call status update
-                                val toolInfo = buildString {
-                                    append("🔧 **${update.title ?: "Tool"}** - ${update.status?.name ?: "updated"}\n")
-                                    update.rawInput?.let {
-                                        append("\n📥 Input:\n```json\n$it\n```\n")
-                                    }
-                                    update.rawOutput?.let {
-                                        append("\n📤 Output:\n```json\n$it\n```\n")
-                                    }
-                                }
-                                emit(ACPMessage.TextChunk(toolInfo, isComplete = false))
-                            }
-                            else -> {
-                                // Handle other update types
+                            is Event.PromptResponseEvent -> {
+                                emit(ACPMessage.Complete)
                             }
                         }
                     }
-                    is Event.PromptResponseEvent -> {
-                        // Message complete
-                        emit(ACPMessage.Complete)
-                    }
-                }
+                // Prompt succeeded — break out of retry loop
+                return@flow
+            } catch (e: CancellationException) {
+                throw e // Never swallow cancellation
+            } catch (e: Exception) {
+                Log.e("ACPClient", "❌ sendMessage attempt ${attempt + 1} failed: ${e.message}", e)
+                lastError = e
+                _connectionState.value = ACPConnectionState.Disconnected
+                // Loop continues to retry
             }
+        }
+
+        // All attempts exhausted
+        Log.e("ACPClient", "❌ sendMessage failed after ${maxReconnectAttempts + 1} attempts")
+        emit(ACPMessage.Error("Message failed after reconnect: ${lastError?.message}"))
     }.flowOn(Dispatchers.IO)
 
     fun approveTool(toolCallId: String, optionId: String = "allow_once") {
