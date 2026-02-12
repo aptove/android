@@ -47,6 +47,12 @@ class ChatApplication : Application() {
 
             val token = task.result
             Log.d(TAG, "📲 FCM token: ${token.take(16)}...")
+            
+            if (BuildConfig.DEBUG) {
+                Log.i(TAG, "🔐 BRUNO TOKEN - Android FCM: $token")
+                println("🔐 BRUNO TOKEN - Android FCM: $token")
+            }
+            
             PushTokenManager.setToken(this, token)
         }
     }

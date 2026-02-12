@@ -41,6 +41,11 @@ class FCMService : FirebaseMessagingService() {
         super.onNewToken(token)
         Log.d(TAG, "📲 New FCM token received: ${token.take(16)}...")
         
+        if (BuildConfig.DEBUG) {
+            Log.i(TAG, "🔐 BRUNO TOKEN - Android FCM: $token")
+            println("🔐 BRUNO TOKEN - Android FCM: $token")
+        }
+        
         // Store the token for later registration with bridge
         PushTokenManager.setToken(this, token)
     }
