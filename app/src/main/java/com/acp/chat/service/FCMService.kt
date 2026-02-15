@@ -8,6 +8,7 @@ import android.content.Intent
 import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import com.acp.chat.BuildConfig
 import com.acp.chat.MainActivity
 import com.acp.chat.R
 import com.google.firebase.messaging.FirebaseMessagingService
