@@ -13,7 +13,7 @@ enum class ConnectionStatus {
 @Entity(tableName = "agents")
 data class Agent(
     @PrimaryKey
-    val id: String = UUID.randomUUID().toString(),
+    val agentId: String = UUID.randomUUID().toString(),
     val name: String,
     val description: String? = null,
     val url: String,
@@ -22,7 +22,7 @@ data class Agent(
     val connectionStatus: ConnectionStatus = ConnectionStatus.DISCONNECTED,
     val lastConnectedAt: Long? = null,
     val createdAt: Long = System.currentTimeMillis(),
-    val colorHue: Float = (id.hashCode().toFloat().mod(360f)),
+    val colorHue: Float = (agentId.hashCode().toFloat().mod(360f)),
     // Session persistence fields
     val activeSessionId: String? = null,
     val sessionStartedAt: Long? = null,

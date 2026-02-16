@@ -66,11 +66,11 @@ fun AgentListScreen(
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(uiState.agents, key = { it.id }) { agent ->
+                    items(uiState.agents, key = { it.agentId }) { agent ->
                         AgentItem(
                             agent = agent,
-                            onClick = { onNavigateToChat(agent.id) },
-                            onConfigure = { onNavigateToAgentConfig(agent.id) },
+                            onClick = { onNavigateToChat(agent.agentId) },
+                            onConfigure = { onNavigateToAgentConfig(agent.agentId) },
                             onDelete = { agentToDelete = agent }
                         )
                     }
@@ -88,7 +88,7 @@ fun AgentListScreen(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        viewModel.disconnectAgent(agent.id)
+                        viewModel.disconnectAgent(agent.agentId)
                         agentToDelete = null
                     },
                     colors = ButtonDefaults.textButtonColors(

@@ -18,10 +18,10 @@ interface AgentDao {
     @Query("SELECT * FROM agents ORDER BY lastConnectedAt DESC, createdAt DESC")
     suspend fun getAllAgentsOnce(): List<Agent>
 
-    @Query("SELECT * FROM agents WHERE id = :agentId")
+    @Query("SELECT * FROM agents WHERE agentId = :agentId")
     suspend fun getAgentById(agentId: String): Agent?
 
-    @Query("SELECT * FROM agents WHERE id = :agentId")
+    @Query("SELECT * FROM agents WHERE agentId = :agentId")
     fun observeAgent(agentId: String): Flow<Agent?>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -33,17 +33,17 @@ interface AgentDao {
     @Delete
     suspend fun deleteAgent(agent: Agent)
 
-    @Query("UPDATE agents SET connectionStatus = :status WHERE id = :agentId")
+    @Query("UPDATE agents SET connectionStatus = :status WHERE agentId = :agentId")
     suspend fun updateConnectionStatus(agentId: String, status: ConnectionStatus)
 
-    @Query("UPDATE agents SET connectionStatus = :status, lastConnectedAt = :timestamp WHERE id = :agentId")
+    @Query("UPDATE agents SET connectionStatus = :status, lastConnectedAt = :timestamp WHERE agentId = :agentId")
     suspend fun updateConnectionStatusAndTimestamp(
         agentId: String,
         status: ConnectionStatus,
         timestamp: Long
     )
 
-    @Query("UPDATE agents SET activeSessionId = :sessionId, sessionStartedAt = :startedAt, supportsLoadSession = :supportsLoad WHERE id = :agentId")
+    @Query("UPDATE agents SET activeSessionId = :sessionId, sessionStartedAt = :startedAt, supportsLoadSession = :supportsLoad WHERE agentId = :agentId")
     suspend fun updateSessionInfo(
         agentId: String,
         sessionId: String?,
@@ -51,6 +51,6 @@ interface AgentDao {
         supportsLoad: Boolean
     )
 
-    @Query("UPDATE agents SET activeSessionId = NULL, sessionStartedAt = NULL WHERE id = :agentId")
+    @Query("UPDATE agents SET activeSessionId = NULL, sessionStartedAt = NULL WHERE agentId = :agentId")
     suspend fun clearSessionInfo(agentId: String)
 }

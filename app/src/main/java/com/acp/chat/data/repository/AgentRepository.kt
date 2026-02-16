@@ -46,7 +46,7 @@ class AgentRepository @Inject constructor(
 
     suspend fun addAgent(agent: Agent, config: ConnectionConfig) {
         agentDao.insertAgent(agent)
-        credentialStorage.saveCredentials(agent.id, config)
+        credentialStorage.saveCredentials(agent.agentId, config)
     }
 
     suspend fun updateAgent(agent: Agent) {

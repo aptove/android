@@ -19,7 +19,7 @@ val MIGRATION_2_3 = object : Migration(2, 3) {
 
 @Database(
     entities = [Agent::class, Message::class],
-    version = 3,
+    version = 4, // Bumped version to recreate schema with agentId instead of id
     exportSchema = false
 )
 @TypeConverters(Converters::class)

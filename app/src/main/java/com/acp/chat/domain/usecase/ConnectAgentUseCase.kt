@@ -59,18 +59,18 @@ class ConnectAgentUseCase @Inject constructor(
             // Check if agent already exists - if so, update credentials
             val existingAgent = agentRepository.findAgentByUrl(config.url)
             if (existingAgent != null) {
-                Log.d(TAG, "Agent exists for URL ${config.url}, updating credentials for ${existingAgent.id}")
-                agentRepository.updateAgentCredentials(existingAgent.id, config)
-                
+                Log.d(TAG, "Agent exists for URL ${config.url}, updating credentials for ${existingAgent.agentId}")
+                agentRepository.updateAgentCredentials(existingAgent.agentId, config)
+
                 // Attempt connection with new credentials
                 val connectResult = acpClient.connect(config)
                 if (connectResult.isFailure) {
                     return Result.failure(connectResult.exceptionOrNull() ?: Exception("Connection failed after credential update"))
                 }
-                
+
                 // Update connection status
-                agentRepository.updateConnectionStatus(existingAgent.id, ConnectionStatus.CONNECTED)
-                
+                agentRepository.updateConnectionStatus(existingAgent.agentId, ConnectionStatus.CONNECTED)
+
                 return Result.success(existingAgent.copy(connectionStatus = ConnectionStatus.CONNECTED))
             }
 
@@ -84,7 +84,7 @@ class ConnectAgentUseCase @Inject constructor(
 
             // Create agent entity
             val agent = Agent(
-                id = UUID.randomUUID().toString(),
+                agentId = UUID.randomUUID().toString(),
                 name = agentInfo.implementation?.name ?: "Unknown Agent",
                 description = agentInfo.implementation?.version ?: "",
                 url = config.url,

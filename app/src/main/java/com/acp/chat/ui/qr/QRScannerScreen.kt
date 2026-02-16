@@ -67,7 +67,7 @@ fun QRScannerScreen(
     LaunchedEffect(state) {
         when (val currentState = state) {
             is QRScannerState.Success -> {
-                onAgentConnected(currentState.agent.id)
+                onAgentConnected(currentState.agent.agentId)
             }
             else -> {}
         }
