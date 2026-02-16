@@ -1,7 +1,10 @@
 package com.acp.chat.domain.acp
 
+import android.content.Context
+import android.content.SharedPreferences
 import android.util.Log
 import com.acp.chat.data.model.ConnectionConfig
+import dagger.hilt.android.qualifiers.ApplicationContext
 import com.agentclientprotocol.agent.AgentInfo
 import com.agentclientprotocol.client.Client
 import com.agentclientprotocol.client.ClientInfo
@@ -40,14 +43,37 @@ data class ToolApprovalRequest(
 )
 
 @Singleton
-class ACPClient @Inject constructor() {
-    
+class ACPClient @Inject constructor(
+    @ApplicationContext private val context: Context
+) {
+
     private var httpClient: HttpClient? = null
 
     private var protocol: Protocol? = null
     private var client: Client? = null
     private var currentConfig: ConnectionConfig? = null
     private var agentCapabilities: AgentCapabilities? = null
+    private var currentSessionId: SessionId? = null
+
+    private val prefs: SharedPreferences by lazy {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    }
+
+    companion object {
+        private const val PREFS_NAME = "acp_client_prefs"
+        private const val KEY_SESSION_ID = "session_id"
+    }
+
+    /** Get the stored session ID from SharedPreferences */
+    private fun getStoredSessionId(): String? {
+        return prefs.getString(KEY_SESSION_ID, null)
+    }
+
+    /** Save the session ID to SharedPreferences */
+    private fun saveSessionId(sessionId: String) {
+        prefs.edit().putString(KEY_SESSION_ID, sessionId).apply()
+        Log.d("ACPClient", "💾 Saved session ID to SharedPreferences: $sessionId")
+    }
     
     private val _connectionState = MutableStateFlow<ACPConnectionState>(ACPConnectionState.Disconnected)
     val connectionState: StateFlow<ACPConnectionState> = _connectionState.asStateFlow()
@@ -243,18 +269,42 @@ class ACPClient @Inject constructor() {
     suspend fun createSession(): Result<ClientSession> = withContext(Dispatchers.IO) {
         try {
             val currentClient = client ?: throw Exception("Not connected")
-            
+
             // Create operations factory with tool approval support
             val operationsFactory = createOperationsFactory()
-            
+
+            // Get stored session ID to pass in _meta for session persistence
+            val storedSessionId = getStoredSessionId()
+            val meta = if (storedSessionId != null) {
+                Log.d("ACPClient", "📋 Passing stored session ID in _meta: $storedSessionId")
+                kotlinx.serialization.json.buildJsonObject {
+                    put("sessionId", kotlinx.serialization.json.JsonPrimitive(storedSessionId))
+                }
+            } else {
+                null
+            }
+
             val session = currentClient.newSession(
                 SessionCreationParameters(
                     cwd = "/tmp",  // Current working directory for the session
-                    mcpServers = emptyList() // No MCP servers for simple chat
+                    mcpServers = emptyList(), // No MCP servers for simple chat
+                    _meta = meta
                 ),
                 operationsFactory
             )
-            
+
+            // Save the session ID for future use
+            val sessionId = session.sessionId.value
+            currentSessionId = session.sessionId
+            saveSessionId(sessionId)
+
+            // Check if session was resumed (same ID as stored)
+            if (storedSessionId != null && sessionId == storedSessionId) {
+                Log.d("ACPClient", "🔄 Session resumed (reusing workspace folder)")
+            } else {
+                Log.d("ACPClient", "🆕 New session created")
+            }
+
             Result.success(session)
         } catch (e: Exception) {
             Result.failure(e)
@@ -593,6 +643,34 @@ class ACPClient @Inject constructor() {
         client = null
         currentConfig = null
         _connectionState.value = ACPConnectionState.Disconnected
+    }
+
+    /**
+     * Clear the conversation history while keeping the session ID and workspace.
+     * This reconnects with the same session ID, which causes the agent to clear session.md
+     */
+    suspend fun clearSession(): Result<ClientSession> = withContext(Dispatchers.IO) {
+        try {
+            Log.d("ACPClient", "🗑️ Clearing session conversation history...")
+
+            val config = currentConfig ?: throw Exception("No connection config available")
+
+            // Disconnect current connection
+            disconnect()
+
+            // Reconnect - this will reuse the stored session ID
+            connect(config).getOrThrow()
+
+            // Create new session - this will clear the conversation
+            val sessionResult = createSession()
+
+            Log.d("ACPClient", "✅ Session conversation cleared, workspace retained")
+
+            sessionResult
+        } catch (e: Exception) {
+            Log.e("ACPClient", "Failed to clear session: ${e.message}", e)
+            Result.failure(e)
+        }
     }
 
     fun cleanup() {
