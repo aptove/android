@@ -3,8 +3,8 @@ package com.acp.chat.ui.agents
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.acp.chat.data.model.Agent
-import com.acp.chat.data.repository.AgentRepository
 import com.acp.chat.data.repository.MessageRepository
+import com.acp.chat.domain.AgentManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -18,7 +18,7 @@ data class AgentListUiState(
 
 @HiltViewModel
 class AgentListViewModel @Inject constructor(
-    private val agentRepository: AgentRepository,
+    private val agentManager: AgentManager,
     private val messageRepository: MessageRepository
 ) : ViewModel() {
 
@@ -31,7 +31,7 @@ class AgentListViewModel @Inject constructor(
 
     private fun loadAgents() {
         viewModelScope.launch {
-            agentRepository.getAllAgents()
+            agentManager.observeAgents()
                 .catch { e ->
                     _uiState.update { it.copy(error = e.message, isLoading = false) }
                 }
@@ -44,9 +44,9 @@ class AgentListViewModel @Inject constructor(
     fun disconnectAgent(agentId: String) {
         viewModelScope.launch {
             try {
-                agentRepository.disconnectFromAgent(agentId)
+                agentManager.disconnectFromAgent(agentId)
                 messageRepository.deleteAllMessagesForAgent(agentId)
-                agentRepository.deleteAgent(agentId)
+                agentManager.deleteAgent(agentId)
             } catch (e: Exception) {
                 _uiState.update { it.copy(error = e.message) }
             }

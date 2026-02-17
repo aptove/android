@@ -4,8 +4,8 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.acp.chat.data.model.Agent
-import com.acp.chat.data.repository.AgentRepository
 import com.acp.chat.data.repository.MessageRepository
+import com.acp.chat.domain.AgentManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -24,7 +24,7 @@ data class AgentConfigurationUiState(
 
 @HiltViewModel
 class AgentConfigurationViewModel @Inject constructor(
-    private val agentRepository: AgentRepository,
+    private val agentManager: AgentManager,
     private val messageRepository: MessageRepository,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
@@ -40,7 +40,7 @@ class AgentConfigurationViewModel @Inject constructor(
 
     private fun loadAgentDetails() {
         viewModelScope.launch {
-            agentRepository.observeAgent(agentId)
+            agentManager.observeAgent(agentId)
                 .catch { e ->
                     _uiState.update { it.copy(error = e.message, isLoading = false) }
                 }
@@ -65,12 +65,9 @@ class AgentConfigurationViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isClearingSession = true) }
             try {
-                // Clear session info from agent
-                agentRepository.clearSessionInfo(agentId)
-                // Clear all messages
+                agentManager.clearSession(agentId)
                 messageRepository.deleteAllMessagesForAgent(agentId)
-                // Disconnect the agent
-                agentRepository.disconnectFromAgent(agentId)
+                agentManager.disconnectFromAgent(agentId)
                 
                 _uiState.update { 
                     it.copy(
@@ -94,9 +91,9 @@ class AgentConfigurationViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isDeletingAgent = true) }
             try {
-                agentRepository.disconnectFromAgent(agentId)
+                agentManager.disconnectFromAgent(agentId)
                 messageRepository.deleteAllMessagesForAgent(agentId)
-                agentRepository.deleteAgent(agentId)
+                agentManager.deleteAgent(agentId)
                 
                 _uiState.update { 
                     it.copy(

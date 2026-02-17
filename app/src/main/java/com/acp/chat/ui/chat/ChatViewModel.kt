@@ -9,8 +9,8 @@ import com.acp.chat.data.model.MessageSender
 import com.acp.chat.data.model.MessageStatus
 import com.acp.chat.data.model.MessageType
 import com.acp.chat.data.model.PermissionOptionInfo
-import com.acp.chat.data.repository.AgentRepository
 import com.acp.chat.data.repository.MessageRepository
+import com.acp.chat.domain.AgentManager
 import com.acp.chat.domain.usecase.SendMessageUseCase
 import com.agentclientprotocol.client.ClientSession
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -33,7 +33,7 @@ data class ChatUiState(
 @HiltViewModel
 class ChatViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
-    private val agentRepository: AgentRepository,
+    private val agentManager: AgentManager,
     private val messageRepository: MessageRepository,
     private val sendMessageUseCase: SendMessageUseCase
 ) : ViewModel() {
@@ -52,7 +52,7 @@ class ChatViewModel @Inject constructor(
 
     private fun loadAgent() {
         viewModelScope.launch {
-            agentRepository.observeAgent(agentId)
+            agentManager.observeAgent(agentId)
                 .collect { agent ->
                     _uiState.update { it.copy(agent = agent) }
                 }
@@ -73,8 +73,7 @@ class ChatViewModel @Inject constructor(
     
     private fun setupToolApprovalHandler() {
         viewModelScope.launch {
-            // Get ACPClient from repository to set up approval handler
-            val acpClient = agentRepository.getACPClient()
+            val acpClient = agentManager.getACPClient()
             acpClient.onToolApprovalRequest = { toolCallId, title, command, options ->
                 android.util.Log.d("ChatViewModel", "Tool approval request: $title, options: ${options.size}")
                 viewModelScope.launch {
@@ -114,7 +113,7 @@ class ChatViewModel @Inject constructor(
 
     private fun connectToAgent() {
         viewModelScope.launch {
-            val result = agentRepository.connectToAgent(agentId)
+            val result = agentManager.connectToAgent(agentId)
             if (result.isSuccess) {
                 val connectionResult = result.getOrNull()!!
                 val session = connectionResult.session
@@ -228,7 +227,7 @@ class ChatViewModel @Inject constructor(
             messageRepository.insertMessage(updatedMessage)
             
             // Resume the continuation in ACPClient with selected option
-            val acpClient = agentRepository.getACPClient()
+            val acpClient = agentManager.getACPClient()
             acpClient.approveTool(toolCallId, optionId)
             
             // Clean up options from memory
@@ -255,7 +254,7 @@ class ChatViewModel @Inject constructor(
             messageRepository.insertMessage(updatedMessage)
             
             // Resume the continuation in ACPClient with cancellation
-            val acpClient = agentRepository.getACPClient()
+            val acpClient = agentManager.getACPClient()
             acpClient.rejectTool(toolCallId)
             
             // Clean up options from memory
