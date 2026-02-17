@@ -23,25 +23,47 @@ A mobile chat application for Android that enables users to connect with AI agen
 
 ## Architecture
 
-The app follows Clean Architecture principles with MVVM pattern:
+The app follows Clean Architecture principles with MVVM pattern, using a layered domain architecture that mirrors the iOS app:
 
 ```
 app/
 ├── data/
 │   ├── model/          # Data models (Agent, Message, ConnectionConfig)
 │   ├── local/          # Room database, DAOs, CredentialStorage
-│   └── repository/     # Repository implementations
+│   └── repository/     # Data-only repository (CRUD + reactive queries)
 ├── domain/
+│   ├── AgentManager    # Business logic: connections, sessions, credentials
 │   ├── acp/            # ACP client wrapper using official SDK
-│   └── usecase/        # Business logic use cases
+│   └── usecase/        # Orchestration use cases (connect, send message)
 ├── ui/
-│   ├── agents/         # Agent list screen
+│   ├── agents/         # Agent list and configuration screens
 │   ├── chat/           # Chat screen
 │   ├── qr/             # QR scanner screen
 │   └── theme/          # Material Theme
 ├── di/                 # Hilt dependency injection modules
-└── service/            # Background services
+└── service/            # Background services (FCM, pairing)
 ```
+
+### Layer Responsibilities
+
+```
+ViewModel
+    ↓
+AgentManager          ← business logic: connections, session cache, credentials
+    ↓
+AgentRepository       ← data only: CRUD, reactive queries (Flow)
+    ↓
+Room Database
+```
+
+| Layer | Responsibility |
+|-------|---------------|
+| `ViewModel` | UI state and presentation logic |
+| `AgentManager` | Connection lifecycle, session caching, credential coordination |
+| `AgentRepository` | Data persistence (CRUD + reactive queries via Flow) |
+| `AgentDao` | Room SQL queries |
+
+This matches the iOS architecture (`AgentManager` → `AgentRepository` → CoreData), making it straightforward to reason about cross-platform behaviour.
 
 ## Technology Stack
 
