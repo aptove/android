@@ -246,6 +246,7 @@ private fun PairingCodeDialog(
                         value = when (selectedPairingType) {
                             PairingType.LOCAL -> "Local Network"
                             PairingType.CLOUDFLARE -> "Cloudflare"
+                            PairingType.TAILSCALE -> "Tailscale"
                             PairingType.UNKNOWN -> "Unknown"
                         },
                         onValueChange = {},
@@ -269,12 +270,18 @@ private fun PairingCodeDialog(
                             }
                         )
                         DropdownMenuItem(
-                            text = { Text("Cloudflare (future)") },
+                            text = { Text("Cloudflare") },
                             onClick = {
                                 selectedPairingType = PairingType.CLOUDFLARE
                                 pairingTypeExpanded = false
-                            },
-                            enabled = false // Not yet implemented
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Tailscale") },
+                            onClick = {
+                                selectedPairingType = PairingType.TAILSCALE
+                                pairingTypeExpanded = false
+                            }
                         )
                     }
                 }

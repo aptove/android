@@ -19,13 +19,15 @@ import javax.net.ssl.X509TrustManager
 
 /**
  * Type of pairing connection.
- * This is determined by the URL path (e.g., /pair/local, /pair/cloudflare).
+ * This is determined by the URL path (e.g., /pair/local, /pair/cloudflare, /pair/tailscale).
  */
 enum class PairingType {
     /** Local network pairing with self-signed certificates */
     LOCAL,
-    /** Cloudflare-tunneled pairing (future) */
+    /** Cloudflare-tunneled pairing */
     CLOUDFLARE,
+    /** Tailscale transport: standard TLS for serve mode, cert pinning for ip mode */
+    TAILSCALE,
     /** Unknown pairing type */
     UNKNOWN;
 
@@ -34,6 +36,7 @@ enum class PairingType {
             return when {
                 path.contains("/pair/local") -> LOCAL
                 path.contains("/pair/cloudflare") -> CLOUDFLARE
+                path.contains("/pair/tailscale") -> TAILSCALE
                 else -> UNKNOWN
             }
         }
@@ -168,10 +171,11 @@ class PairingService @Inject constructor() {
      */
     suspend fun pair(pairingURL: PairingURL): PairingResult {
         Log.d(TAG, "Starting pairing with type: ${pairingURL.pairingType}")
-        
+
         return when (pairingURL.pairingType) {
             PairingType.LOCAL -> pairLocal(pairingURL)
             PairingType.CLOUDFLARE -> pairCloudflare(pairingURL)
+            PairingType.TAILSCALE -> pairTailscale(pairingURL)
             PairingType.UNKNOWN -> PairingResult.UnknownError("Unknown pairing type for URL: ${pairingURL.fullURL}")
         }
     }
@@ -302,6 +306,86 @@ class PairingService @Inject constructor() {
         }
     }
     
+    /**
+     * Tailscale transport pairing.
+     * - ip mode (fingerprint present): reuses cert-pinning logic from pairLocal.
+     * - serve mode (fingerprint absent): Tailscale provides a valid Let's Encrypt cert → standard TLS.
+     */
+    private suspend fun pairTailscale(pairingURL: PairingURL): PairingResult {
+        Log.d(TAG, "🔐 PairingService: Starting Tailscale pairing")
+
+        if (pairingURL.fingerprint != null) {
+            // ip mode: fingerprint present — reuse cert-pinning logic
+            Log.d(TAG, "🔐 PairingService: Tailscale ip mode — using cert pinning")
+            return pairLocal(pairingURL)
+        }
+
+        // serve mode: standard TLS
+        Log.d(TAG, "🔐 PairingService: Tailscale serve mode — using standard TLS")
+        return withContext(Dispatchers.IO) {
+            val okHttpClient = OkHttpClient.Builder()
+                .connectTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+                .readTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+                .writeTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+                .build()
+
+            try {
+                val request = Request.Builder()
+                    .url(pairingURL.fullURL)
+                    .get()
+                    .build()
+
+                Log.d(TAG, "📤 Sending Tailscale pairing request to: ${pairingURL.fullURL}")
+
+                val response = okHttpClient.newCall(request).execute()
+                val responseBody = response.body?.string() ?: ""
+
+                Log.d(TAG, "📥 Response code: ${response.code}")
+
+                when (response.code) {
+                    200 -> {
+                        val pairingResponse = json.decodeFromString<PairingResponse>(responseBody)
+                        val config = ConnectionConfig(
+                            url = pairingResponse.url,
+                            authToken = pairingResponse.authToken,
+                            certFingerprint = null, // serve mode: no pinning needed
+                            protocol = pairingResponse.protocol,
+                            version = pairingResponse.version
+                        )
+                        Log.d(TAG, "✅ Tailscale pairing successful: ${config.url}")
+                        PairingResult.Success(config)
+                    }
+                    401 -> {
+                        val error = json.decodeFromString<PairingError>(responseBody)
+                        Log.w(TAG, "❌ Invalid code: ${error.message}")
+                        PairingResult.InvalidCode(error.message)
+                    }
+                    429 -> {
+                        val error = json.decodeFromString<PairingError>(responseBody)
+                        Log.w(TAG, "❌ Rate limited: ${error.message}")
+                        PairingResult.RateLimited(error.message)
+                    }
+                    else -> {
+                        Log.e(TAG, "❌ Unexpected response ${response.code}: $responseBody")
+                        PairingResult.UnknownError("Unexpected response: ${response.code}")
+                    }
+                }
+            } catch (e: java.net.ConnectException) {
+                Log.e(TAG, "🌐 Connection refused", e)
+                PairingResult.NetworkError("Connection refused. Make sure the bridge is running.")
+            } catch (e: java.net.SocketTimeoutException) {
+                Log.e(TAG, "🌐 Connection timed out", e)
+                PairingResult.NetworkError("Connection timed out.")
+            } catch (e: java.net.UnknownHostException) {
+                Log.e(TAG, "🌐 Unknown host: ${e.message}", e)
+                PairingResult.NetworkError("Cannot resolve host. Ensure your device is on the same tailnet.")
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Network error during Tailscale pairing: ${e.javaClass.simpleName}", e)
+                PairingResult.NetworkError("${e.javaClass.simpleName}: ${e.message ?: "Connection failed"}")
+            }
+        }
+    }
+
     /**
      * Cloudflare-tunneled pairing. Uses standard HTTPS (no cert pinning) since
      * Cloudflare handles TLS termination with a valid public certificate.

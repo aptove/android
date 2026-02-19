@@ -159,6 +159,7 @@ class QRScannerViewModel @Inject constructor(
             val pathSegment = when (pairingType) {
                 PairingType.LOCAL -> "local"
                 PairingType.CLOUDFLARE -> "cloudflare"
+                PairingType.TAILSCALE -> "tailscale"
                 PairingType.UNKNOWN -> "local" // Default to local
             }
             
