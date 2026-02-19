@@ -303,13 +303,75 @@ class PairingService @Inject constructor() {
     }
     
     /**
-     * Cloudflare-tunneled pairing (future implementation).
+     * Cloudflare-tunneled pairing. Uses standard HTTPS (no cert pinning) since
+     * Cloudflare handles TLS termination with a valid public certificate.
      */
-    private suspend fun pairCloudflare(pairingURL: PairingURL): PairingResult {
-        // TODO: Implement Cloudflare pairing when needed
-        // This would use standard HTTPS without certificate pinning
-        // since Cloudflare handles TLS termination
-        return PairingResult.UnknownError("Cloudflare pairing not yet implemented")
+    private suspend fun pairCloudflare(pairingURL: PairingURL): PairingResult = withContext(Dispatchers.IO) {
+        val okHttpClient = OkHttpClient.Builder()
+            .connectTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+            .writeTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+            .build()
+
+        try {
+            val request = Request.Builder()
+                .url(pairingURL.fullURL)
+                .get()
+                .build()
+
+            Log.d(TAG, "📤 Sending Cloudflare pairing request to: ${pairingURL.fullURL}")
+
+            val response = okHttpClient.newCall(request).execute()
+            val responseBody = response.body?.string() ?: ""
+
+            Log.d(TAG, "📥 Response code: ${response.code}")
+
+            when (response.code) {
+                200 -> {
+                    val pairingResponse = json.decodeFromString<PairingResponse>(responseBody)
+
+                    val config = ConnectionConfig(
+                        url = pairingResponse.url,
+                        authToken = pairingResponse.authToken,
+                        certFingerprint = null, // No cert pinning for Cloudflare
+                        protocol = pairingResponse.protocol,
+                        version = pairingResponse.version
+                    )
+
+                    Log.d(TAG, "✅ Cloudflare pairing successful: ${config.url}")
+                    PairingResult.Success(config)
+                }
+
+                401 -> {
+                    val error = json.decodeFromString<PairingError>(responseBody)
+                    Log.w(TAG, "❌ Invalid code: ${error.message}")
+                    PairingResult.InvalidCode(error.message)
+                }
+
+                429 -> {
+                    val error = json.decodeFromString<PairingError>(responseBody)
+                    Log.w(TAG, "❌ Rate limited: ${error.message}")
+                    PairingResult.RateLimited(error.message)
+                }
+
+                else -> {
+                    Log.e(TAG, "❌ Unexpected response ${response.code}: $responseBody")
+                    PairingResult.UnknownError("Unexpected response: ${response.code}")
+                }
+            }
+        } catch (e: java.net.ConnectException) {
+            Log.e(TAG, "🌐 Connection refused", e)
+            PairingResult.NetworkError("Connection refused. Make sure the bridge is running.")
+        } catch (e: java.net.SocketTimeoutException) {
+            Log.e(TAG, "🌐 Connection timed out", e)
+            PairingResult.NetworkError("Connection timed out.")
+        } catch (e: java.net.UnknownHostException) {
+            Log.e(TAG, "🌐 Unknown host: ${e.message}", e)
+            PairingResult.NetworkError("Cannot resolve host. Check the bridge address.")
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Network error during Cloudflare pairing: ${e.javaClass.simpleName}", e)
+            PairingResult.NetworkError("${e.javaClass.simpleName}: ${e.message ?: "Connection failed"}")
+        }
     }
     
     /**
