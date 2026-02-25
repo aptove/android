@@ -208,15 +208,12 @@ private fun AgentItem(
                             ConnectionStatus.RECONNECTING -> Color(0xFFFFA726)
                         }
                     )
-                    // Show active transport when connected, otherwise preferred transport
-                    (activeTransport ?: agent.preferredTransport)?.let { transport ->
+                    // Show active transport only when connected
+                    activeTransport?.let { transport ->
                         Text(
                             text = stringResource(R.string.transport_via, transportDisplayName(transport)),
                             style = MaterialTheme.typography.labelSmall,
-                            color = if (activeTransport != null)
-                                MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
-                            else
-                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
                         )
                     }
                 }

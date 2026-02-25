@@ -123,16 +123,6 @@ class AgentConfigurationViewModel @Inject constructor(
         }
     }
 
-    fun setPreferredTransport(transport: String?) {
-        viewModelScope.launch {
-            try {
-                agentManager.setPreferredTransport(agentId, transport)
-            } catch (e: Exception) {
-                _uiState.update { it.copy(error = e.message) }
-            }
-        }
-    }
-
     fun deleteEndpoint(endpointId: String) {
         viewModelScope.launch {
             try {

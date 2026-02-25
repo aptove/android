@@ -9,8 +9,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -95,8 +93,6 @@ fun AgentConfigurationScreen(
                     if (uiState.endpoints.isNotEmpty()) {
                         TransportsCard(
                             endpoints = uiState.endpoints,
-                            preferredTransport = agent.preferredTransport,
-                            onSetPreferred = { viewModel.setPreferredTransport(it) },
                             onDelete = { viewModel.deleteEndpoint(it) }
                         )
                     }
@@ -215,11 +211,6 @@ private fun AgentInfoCard(agent: com.acp.chat.data.model.Agent) {
             )
             
             InfoRow(
-                label = stringResource(R.string.url_label),
-                value = agent.url
-            )
-            
-            InfoRow(
                 label = stringResource(R.string.status_label),
                 value = when (agent.connectionStatus) {
                     ConnectionStatus.CONNECTED -> stringResource(R.string.agent_connected)
@@ -299,8 +290,6 @@ private fun SessionInfoCard(
 @Composable
 private fun TransportsCard(
     endpoints: List<TransportEndpoint>,
-    preferredTransport: String?,
-    onSetPreferred: (String?) -> Unit,
     onDelete: (String) -> Unit
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -315,10 +304,6 @@ private fun TransportsCard(
             endpoints.forEach { endpoint ->
                 TransportEndpointRow(
                     endpoint = endpoint,
-                    isPreferred = endpoint.transport == preferredTransport,
-                    onSetPreferred = {
-                        onSetPreferred(if (endpoint.transport == preferredTransport) null else endpoint.transport)
-                    },
                     onDelete = { onDelete(endpoint.endpointId) }
                 )
             }
@@ -329,8 +314,6 @@ private fun TransportsCard(
 @Composable
 private fun TransportEndpointRow(
     endpoint: TransportEndpoint,
-    isPreferred: Boolean,
-    onSetPreferred: () -> Unit,
     onDelete: () -> Unit
 ) {
     Row(
@@ -338,7 +321,7 @@ private fun TransportEndpointRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Active indicator
+        // Active indicator — green when this transport is currently connected
         Box(
             modifier = Modifier
                 .size(8.dp)
@@ -358,14 +341,6 @@ private fun TransportEndpointRow(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                 maxLines = 1
-            )
-        }
-
-        IconButton(onClick = onSetPreferred) {
-            Icon(
-                imageVector = if (isPreferred) Icons.Filled.Star else Icons.Outlined.StarBorder,
-                contentDescription = stringResource(R.string.transport_preferred),
-                tint = if (isPreferred) Color(0xFFFFC107) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
             )
         }
 
