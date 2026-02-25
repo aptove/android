@@ -69,6 +69,7 @@ fun AgentListScreen(
                     items(uiState.agents, key = { it.agentId }) { agent ->
                         AgentItem(
                             agent = agent,
+                            activeTransport = uiState.activeTransports[agent.agentId],
                             onClick = { onNavigateToChat(agent.agentId) },
                             onConfigure = { onNavigateToAgentConfig(agent.agentId) },
                             onDelete = { agentToDelete = agent }
@@ -150,6 +151,7 @@ private fun EmptyAgentsView(
 @Composable
 private fun AgentItem(
     agent: Agent,
+    activeTransport: String?,
     onClick: () -> Unit,
     onConfigure: () -> Unit,
     onDelete: () -> Unit
@@ -206,6 +208,17 @@ private fun AgentItem(
                             ConnectionStatus.RECONNECTING -> Color(0xFFFFA726)
                         }
                     )
+                    // Show active transport when connected, otherwise preferred transport
+                    (activeTransport ?: agent.preferredTransport)?.let { transport ->
+                        Text(
+                            text = stringResource(R.string.transport_via, transportDisplayName(transport)),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (activeTransport != null)
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
+                            else
+                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                        )
+                    }
                 }
 
                 // Settings button
@@ -250,4 +263,12 @@ private fun AgentItem(
             }
         }
     }
+}
+
+private fun transportDisplayName(transport: String): String = when (transport) {
+    "tailscale-serve" -> "Tailscale (Serve)"
+    "tailscale-ip"    -> "Tailscale (IP)"
+    "cloudflare"      -> "Cloudflare"
+    "local"           -> "Local Network"
+    else              -> transport
 }

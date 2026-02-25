@@ -5,6 +5,7 @@ import androidx.room.Room
 import com.acp.chat.data.local.AgentDao
 import com.acp.chat.data.local.AppDatabase
 import com.acp.chat.data.local.MessageDao
+import com.acp.chat.data.local.TransportEndpointDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -24,17 +25,17 @@ object DatabaseModule {
             AppDatabase::class.java,
             "acp_chat_database"
         )
-            .fallbackToDestructiveMigration()
+            .addMigrations(AppDatabase.MIGRATION_4_5)
             .build()
     }
 
     @Provides
-    fun provideAgentDao(database: AppDatabase): AgentDao {
-        return database.agentDao()
-    }
+    fun provideAgentDao(database: AppDatabase): AgentDao = database.agentDao()
 
     @Provides
-    fun provideMessageDao(database: AppDatabase): MessageDao {
-        return database.messageDao()
-    }
+    fun provideMessageDao(database: AppDatabase): MessageDao = database.messageDao()
+
+    @Provides
+    fun provideTransportEndpointDao(database: AppDatabase): TransportEndpointDao =
+        database.transportEndpointDao()
 }

@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.acp.chat.data.model.Agent
+import com.acp.chat.data.model.TransportEndpoint
 import com.acp.chat.data.repository.MessageRepository
 import com.acp.chat.domain.AgentManager
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -19,7 +20,8 @@ data class AgentConfigurationUiState(
     val isDeletingAgent: Boolean = false,
     val sessionCleared: Boolean = false,
     val agentDeleted: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    val endpoints: List<TransportEndpoint> = emptyList()
 )
 
 @HiltViewModel
@@ -36,6 +38,15 @@ class AgentConfigurationViewModel @Inject constructor(
 
     init {
         loadAgentDetails()
+        loadEndpoints()
+    }
+
+    private fun loadEndpoints() {
+        viewModelScope.launch {
+            agentManager.observeEndpoints(agentId).collect { endpoints ->
+                _uiState.update { it.copy(endpoints = endpoints) }
+            }
+        }
     }
 
     private fun loadAgentDetails() {
@@ -108,6 +119,26 @@ class AgentConfigurationViewModel @Inject constructor(
                         error = e.message
                     )
                 }
+            }
+        }
+    }
+
+    fun setPreferredTransport(transport: String?) {
+        viewModelScope.launch {
+            try {
+                agentManager.setPreferredTransport(agentId, transport)
+            } catch (e: Exception) {
+                _uiState.update { it.copy(error = e.message) }
+            }
+        }
+    }
+
+    fun deleteEndpoint(endpointId: String) {
+        viewModelScope.launch {
+            try {
+                agentManager.deleteTransportEndpoint(endpointId)
+            } catch (e: Exception) {
+                _uiState.update { it.copy(error = e.message) }
             }
         }
     }

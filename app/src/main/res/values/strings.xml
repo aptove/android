@@ -84,4 +84,10 @@
     <string name="error">Error</string>
     <string name="ok">OK</string>
     <string name="configure_agent">Configure Agent</string>
+
+    <!-- Transport Endpoints -->
+    <string name="transports_title">Transports</string>
+    <string name="transport_preferred">Preferred transport</string>
+    <string name="transport_delete">Delete transport</string>
+    <string name="transport_via">via %1$s</string>
 </resources>

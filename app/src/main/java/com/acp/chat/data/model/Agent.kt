@@ -26,5 +26,10 @@ data class Agent(
     // Session persistence fields
     val activeSessionId: String? = null,
     val sessionStartedAt: Long? = null,
-    val supportsLoadSession: Boolean = false
+    val supportsLoadSession: Boolean = false,
+    // Multi-transport fields
+    /** Stable UUID from the bridge; null for legacy agents (no bridgeAgentId in QR). */
+    val bridgeAgentId: String? = null,
+    /** User-selected preferred transport (e.g. "tailscale-serve", "cloudflare", "local"). */
+    val preferredTransport: String? = null
 )

@@ -35,9 +35,16 @@ class ConnectAgentUseCase @Inject constructor(
      * Connect to an agent using a pre-built ConnectionConfig.
      * Used by the pairing service after successful pairing.
      *
-     * If an agent with the same URL already exists, updates its credentials instead of creating a new one.
+     * Deduplication order:
+     * 1. If bridgeAgentId matches an existing agent → add/update transport endpoint only.
+     * 2. If URL matches an existing agent → update credentials.
+     * 3. Otherwise → create new agent.
      */
-    suspend fun connectWithConfig(config: ConnectionConfig): Result<Agent> {
+    suspend fun connectWithConfig(
+        config: ConnectionConfig,
+        bridgeAgentId: String? = null,
+        transport: String = "local"
+    ): Result<Agent> {
         return try {
             if (config.url.isBlank()) {
                 return Result.failure(Exception("URL is required"))
@@ -51,7 +58,23 @@ class ConnectAgentUseCase @Inject constructor(
                 return Result.failure(Exception("Authentication required for remote connections"))
             }
 
-            // Check if agent already exists - if so, update credentials
+            // 1. Dedup by stable bridge agent ID (multi-transport)
+            if (!bridgeAgentId.isNullOrBlank()) {
+                val existingByBridgeId = agentManager.findAgentByBridgeAgentId(bridgeAgentId)
+                if (existingByBridgeId != null) {
+                    Log.d(TAG, "Bridge agent $bridgeAgentId already registered as ${existingByBridgeId.agentId}, adding transport endpoint")
+                    agentManager.addOrUpdateTransportEndpoint(existingByBridgeId.agentId, transport, config)
+                    val connectResult = agentManager.connectAgent(existingByBridgeId.agentId)
+                    return if (connectResult.isSuccess) {
+                        agentManager.updateConnectionStatus(existingByBridgeId.agentId, ConnectionStatus.CONNECTED)
+                        Result.success(existingByBridgeId.copy(connectionStatus = ConnectionStatus.CONNECTED))
+                    } else {
+                        Result.failure(connectResult.exceptionOrNull() ?: Exception("Connection failed"))
+                    }
+                }
+            }
+
+            // 2. Dedup by URL (legacy/same-transport re-scan)
             val existingAgent = agentManager.findAgentByUrl(config.url)
             if (existingAgent != null) {
                 Log.d(TAG, "Agent exists for URL ${config.url}, updating credentials for ${existingAgent.agentId}")
@@ -82,10 +105,15 @@ class ConnectAgentUseCase @Inject constructor(
                 url = config.url,
                 protocolVersion = config.version,
                 connectionStatus = ConnectionStatus.CONNECTED,
-                lastConnectedAt = System.currentTimeMillis()
+                lastConnectedAt = System.currentTimeMillis(),
+                bridgeAgentId = bridgeAgentId
             )
 
             agentManager.addAgent(agent, config)
+
+            if (!bridgeAgentId.isNullOrBlank()) {
+                agentManager.addOrUpdateTransportEndpoint(agent.agentId, transport, config)
+            }
 
             Result.success(agent)
         } catch (e: Exception) {

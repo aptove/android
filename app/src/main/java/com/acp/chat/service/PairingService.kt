@@ -123,7 +123,8 @@ data class PairingResponse(
     val protocol: String,
     val version: String,
     val authToken: String,
-    val certFingerprint: String? = null
+    val certFingerprint: String? = null,
+    val agentId: String? = null
 )
 
 /**
@@ -139,7 +140,13 @@ data class PairingError(
  * Result of a pairing attempt.
  */
 sealed class PairingResult {
-    data class Success(val config: ConnectionConfig) : PairingResult()
+    data class Success(
+        val config: ConnectionConfig,
+        /** Stable UUID from the bridge for multi-transport deduplication. */
+        val bridgeAgentId: String? = null,
+        /** Transport type used (e.g. "local", "cloudflare", "tailscale-serve", "tailscale-ip"). */
+        val transport: String = "local"
+    ) : PairingResult()
     data class InvalidCode(val message: String) : PairingResult()
     data class RateLimited(val message: String) : PairingResult()
     data class CertificateMismatch(val expected: String?, val actual: String) : PairingResult()
@@ -183,7 +190,7 @@ class PairingService @Inject constructor() {
     /**
      * Local pairing with certificate pinning.
      */
-    private suspend fun pairLocal(pairingURL: PairingURL): PairingResult = withContext(Dispatchers.IO) {
+    private suspend fun pairLocal(pairingURL: PairingURL, transport: String = "local"): PairingResult = withContext(Dispatchers.IO) {
         var actualFingerprint: String? = null
         
         // Create trust manager that captures and validates the certificate fingerprint
@@ -259,7 +266,7 @@ class PairingService @Inject constructor() {
                     )
                     
                     Log.d(TAG, "✅ Pairing successful, got WebSocket URL: ${config.url}")
-                    PairingResult.Success(config)
+                    PairingResult.Success(config, bridgeAgentId = pairingResponse.agentId, transport = transport)
                 }
                 
                 401 -> {
@@ -317,7 +324,7 @@ class PairingService @Inject constructor() {
         if (pairingURL.fingerprint != null) {
             // ip mode: fingerprint present — reuse cert-pinning logic
             Log.d(TAG, "🔐 PairingService: Tailscale ip mode — using cert pinning")
-            return pairLocal(pairingURL)
+            return pairLocal(pairingURL, transport = "tailscale-ip")
         }
 
         // serve mode: standard TLS
@@ -353,7 +360,7 @@ class PairingService @Inject constructor() {
                             version = pairingResponse.version
                         )
                         Log.d(TAG, "✅ Tailscale pairing successful: ${config.url}")
-                        PairingResult.Success(config)
+                        PairingResult.Success(config, bridgeAgentId = pairingResponse.agentId, transport = "tailscale-serve")
                     }
                     401 -> {
                         val error = json.decodeFromString<PairingError>(responseBody)
@@ -423,7 +430,7 @@ class PairingService @Inject constructor() {
                     )
 
                     Log.d(TAG, "✅ Cloudflare pairing successful: ${config.url}")
-                    PairingResult.Success(config)
+                    PairingResult.Success(config, bridgeAgentId = pairingResponse.agentId, transport = "cloudflare")
                 }
 
                 401 -> {

@@ -33,6 +33,12 @@ interface AgentDao {
     @Delete
     suspend fun deleteAgent(agent: Agent)
 
+    @Query("SELECT * FROM agents WHERE bridgeAgentId = :bridgeAgentId LIMIT 1")
+    suspend fun getAgentByBridgeAgentId(bridgeAgentId: String): Agent?
+
+    @Query("UPDATE agents SET preferredTransport = :transport WHERE agentId = :agentId")
+    suspend fun updatePreferredTransport(agentId: String, transport: String?)
+
     @Query("UPDATE agents SET connectionStatus = :status WHERE agentId = :agentId")
     suspend fun updateConnectionStatus(agentId: String, status: ConnectionStatus)
 

@@ -1,21 +1,28 @@
 package com.acp.chat.ui.agents
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.acp.chat.R
 import com.acp.chat.data.model.ConnectionStatus
+import com.acp.chat.data.model.TransportEndpoint
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -83,6 +90,16 @@ fun AgentConfigurationScreen(
                         agent = agent,
                         messageCount = uiState.messageCount
                     )
+
+                    // Transports Section (only shown when transport endpoints exist)
+                    if (uiState.endpoints.isNotEmpty()) {
+                        TransportsCard(
+                            endpoints = uiState.endpoints,
+                            preferredTransport = agent.preferredTransport,
+                            onSetPreferred = { viewModel.setPreferredTransport(it) },
+                            onDelete = { viewModel.deleteEndpoint(it) }
+                        )
+                    }
 
                     // Actions Section
                     ActionsCard(
@@ -277,6 +294,97 @@ private fun SessionInfoCard(
             }
         }
     }
+}
+
+@Composable
+private fun TransportsCard(
+    endpoints: List<TransportEndpoint>,
+    preferredTransport: String?,
+    onSetPreferred: (String?) -> Unit,
+    onDelete: (String) -> Unit
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = stringResource(R.string.transports_title),
+                style = MaterialTheme.typography.titleMedium
+            )
+            endpoints.forEach { endpoint ->
+                TransportEndpointRow(
+                    endpoint = endpoint,
+                    isPreferred = endpoint.transport == preferredTransport,
+                    onSetPreferred = {
+                        onSetPreferred(if (endpoint.transport == preferredTransport) null else endpoint.transport)
+                    },
+                    onDelete = { onDelete(endpoint.endpointId) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TransportEndpointRow(
+    endpoint: TransportEndpoint,
+    isPreferred: Boolean,
+    onSetPreferred: () -> Unit,
+    onDelete: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Active indicator
+        Box(
+            modifier = Modifier
+                .size(8.dp)
+                .clip(CircleShape)
+                .background(
+                    if (endpoint.isActive) Color(0xFF4CAF50) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                )
+        )
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = transportDisplayName(endpoint.transport),
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Text(
+                text = endpoint.url,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                maxLines = 1
+            )
+        }
+
+        IconButton(onClick = onSetPreferred) {
+            Icon(
+                imageVector = if (isPreferred) Icons.Filled.Star else Icons.Outlined.StarBorder,
+                contentDescription = stringResource(R.string.transport_preferred),
+                tint = if (isPreferred) Color(0xFFFFC107) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+            )
+        }
+
+        IconButton(onClick = onDelete) {
+            Icon(
+                Icons.Default.Delete,
+                contentDescription = stringResource(R.string.transport_delete),
+                tint = MaterialTheme.colorScheme.error
+            )
+        }
+    }
+}
+
+private fun transportDisplayName(transport: String): String = when (transport) {
+    "tailscale-serve" -> "Tailscale (Serve)"
+    "tailscale-ip"    -> "Tailscale (IP)"
+    "cloudflare"      -> "Cloudflare"
+    "local"           -> "Local Network"
+    else              -> transport
 }
 
 @Composable

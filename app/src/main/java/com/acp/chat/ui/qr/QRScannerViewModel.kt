@@ -71,8 +71,11 @@ class QRScannerViewModel @Inject constructor(
                 Log.d(TAG, "Pairing successful, connecting to WebSocket")
                 _state.value = QRScannerState.Pairing("Pairing successful, connecting...")
                 
-                // Now connect using the connection config
-                val connectResult = connectAgentUseCase.connectWithConfig(result.config)
+                val connectResult = connectAgentUseCase.connectWithConfig(
+                    config = result.config,
+                    bridgeAgentId = result.bridgeAgentId,
+                    transport = result.transport
+                )
                 
                 _state.value = if (connectResult.isSuccess) {
                     QRScannerState.Success(connectResult.getOrThrow())
