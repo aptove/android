@@ -15,6 +15,8 @@ import com.agentclientprotocol.client.ClientSession
 import com.agentclientprotocol.model.SessionId
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.sync.Mutex
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -47,6 +49,15 @@ class AgentManager @Inject constructor(
 ) {
 
     private val sessionCache = mutableMapOf<String, ClientSession>()
+
+    /**
+     * Per-agent mutex preventing duplicate concurrent connection attempts.
+     * ConcurrentHashMap.computeIfAbsent is atomic, so getMutex() is safe to
+     * call from multiple coroutines without additional locking.
+     */
+    private val agentMutexes = ConcurrentHashMap<String, Mutex>()
+    private fun getMutex(agentId: String): Mutex =
+        agentMutexes.computeIfAbsent(agentId) { Mutex() }
 
     companion object {
         private const val TAG = "AgentManager"
@@ -210,8 +221,35 @@ class AgentManager @Inject constructor(
     /**
      * Connect using transport endpoints in priority order, falling back to legacy single-URL.
      * Preferred transport (if set) is tried first.
+     *
+     * A per-agent [Mutex] prevents duplicate concurrent connection attempts: if a connection
+     * is already in progress for [agentId], this call returns immediately with failure so the
+     * caller (auto-connect / background-retry) can safely skip it without opening a second
+     * WebSocket to the bridge.
      */
     suspend fun connectAgent(agentId: String): Result<ConnectionResult> {
+        val mutex = getMutex(agentId)
+        // tryLock() returns false if another coroutine already holds the lock for this agent.
+        if (!mutex.tryLock()) {
+            Log.d(TAG, "📱 connectAgent: Already connecting to $agentId, skipping duplicate")
+            return Result.failure(Exception("Connection already in progress for $agentId"))
+        }
+        try {
+            return connectAgentInternal(agentId)
+        } finally {
+            mutex.unlock()
+        }
+    }
+
+    /** Internal implementation called only while holding the per-agent mutex. */
+    private suspend fun connectAgentInternal(agentId: String): Result<ConnectionResult> {
+        // If a session is already cached, skip the full reconnect.
+        sessionCache[agentId]?.let {
+            Log.d(TAG, "📱 connectAgentInternal: Agent $agentId already connected, skipping")
+            repository.updateConnectionStatus(agentId, ConnectionStatus.CONNECTED)
+            return Result.success(ConnectionResult(it, wasResumed = true))
+        }
+
         val agent = repository.getAgentById(agentId)
             ?: return Result.failure(Exception("Agent not found: $agentId"))
 
