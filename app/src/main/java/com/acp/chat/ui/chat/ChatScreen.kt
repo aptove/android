@@ -1,5 +1,9 @@
 package com.acp.chat.ui.chat
 
+import android.Manifest
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -11,6 +15,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -31,11 +36,36 @@ import java.util.*
 @Composable
 fun ChatScreen(
     onNavigateBack: () -> Unit,
-    viewModel: ChatViewModel = hiltViewModel()
+    viewModel: ChatViewModel = hiltViewModel(),
+    voiceInputViewModel: VoiceInputViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
+    val voiceState by voiceInputViewModel.recordingState.collectAsState()
+    val rawTranscript by voiceInputViewModel.rawTranscript.collectAsState()
+
+    val micPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            voiceInputViewModel.startRecording()
+        }
+    }
+
+    LaunchedEffect(rawTranscript) {
+        rawTranscript?.let { transcript ->
+            voiceInputViewModel.clearTranscript()
+            viewModel.sendVoiceCorrectionRequest(transcript)
+        }
+    }
+
+    LaunchedEffect(uiState.voiceCorrectedText) {
+        uiState.voiceCorrectedText?.let { corrected ->
+            viewModel.updateInputText(corrected)
+            viewModel.clearVoiceCorrectedText()
+        }
+    }
 
     LaunchedEffect(uiState.messages.size) {
         if (uiState.messages.isNotEmpty()) {
@@ -48,7 +78,7 @@ fun ChatScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { 
+                title = {
                     Column {
                         Text(uiState.agent?.name ?: stringResource(R.string.chat_title))
                         // Show session status indicator
@@ -62,9 +92,9 @@ fun ChatScreen(
                                 Text(
                                     text = statusText,
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = if (uiState.sessionResumed == true) 
-                                        MaterialTheme.colorScheme.primary 
-                                    else 
+                                    color = if (uiState.sessionResumed == true)
+                                        MaterialTheme.colorScheme.primary
+                                    else
                                         MaterialTheme.colorScheme.secondary
                                 )
                             }
@@ -83,6 +113,15 @@ fun ChatScreen(
                 inputText = uiState.inputText,
                 onInputTextChange = viewModel::updateInputText,
                 onSendMessage = viewModel::sendMessage,
+                onVoiceInput = {
+                    if (voiceState is RecordingState.Recording) {
+                        voiceInputViewModel.stopRecording()
+                    } else {
+                        micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                    }
+                },
+                isRecording = voiceState is RecordingState.Recording,
+                isCorrectionPending = uiState.isVoiceCorrectionPending,
                 enabled = !uiState.isSending
             )
         }
@@ -348,11 +387,15 @@ private fun MessageBubble(
     }
 }
 
+@OptIn(androidx.compose.animation.ExperimentalAnimationApi::class)
 @Composable
 private fun MessageInputBar(
     inputText: String,
     onInputTextChange: (String) -> Unit,
     onSendMessage: () -> Unit,
+    onVoiceInput: () -> Unit,
+    isRecording: Boolean,
+    isCorrectionPending: Boolean,
     enabled: Boolean
 ) {
     Surface(
@@ -374,14 +417,42 @@ private fun MessageInputBar(
                 maxLines = 4
             )
 
-            IconButton(
-                onClick = onSendMessage,
-                enabled = enabled && inputText.isNotBlank()
-            ) {
-                Icon(
-                    Icons.AutoMirrored.Filled.Send,
-                    contentDescription = stringResource(R.string.send_message)
-                )
+            AnimatedContent(
+                targetState = inputText.isEmpty(),
+                label = "voice_send_toggle"
+            ) { isEmpty ->
+                if (isEmpty) {
+                    IconButton(
+                        onClick = onVoiceInput,
+                        enabled = enabled && !isCorrectionPending
+                    ) {
+                        when {
+                            isRecording -> Icon(
+                                Icons.Filled.Mic,
+                                contentDescription = "Stop recording",
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                            isCorrectionPending -> CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                strokeWidth = 2.dp
+                            )
+                            else -> Text(
+                                "🎙️",
+                                style = MaterialTheme.typography.titleLarge
+                            )
+                        }
+                    }
+                } else {
+                    IconButton(
+                        onClick = onSendMessage,
+                        enabled = enabled && inputText.isNotBlank()
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.Send,
+                            contentDescription = stringResource(R.string.send_message)
+                        )
+                    }
+                }
             }
         }
     }

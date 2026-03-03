@@ -27,7 +27,9 @@ data class ChatUiState(
     val session: ClientSession? = null,
     val pendingApprovalOptions: Map<String, List<PermissionOptionInfo>> = emptyMap(),
     val sessionResumed: Boolean? = null, // null = unknown, true = resumed, false = new
-    val showSessionIndicator: Boolean = false
+    val showSessionIndicator: Boolean = false,
+    val isVoiceCorrectionPending: Boolean = false,
+    val voiceCorrectedText: String? = null,
 )
 
 @HiltViewModel
@@ -263,6 +265,57 @@ class ChatViewModel @Inject constructor(
                 newOptionsMap.remove(messageId)
                 state.copy(pendingApprovalOptions = newOptionsMap)
             }
+        }
+    }
+
+    fun sendVoiceCorrectionRequest(rawTranscript: String) {
+        val session = _uiState.value.session ?: run {
+            _uiState.update { it.copy(voiceCorrectedText = rawTranscript) }
+            return
+        }
+        viewModelScope.launch {
+            _uiState.update { it.copy(isVoiceCorrectionPending = true) }
+            val correctionJson = buildCorrectionJson(rawTranscript)
+            var accumulated = ""
+            try {
+                agentManager.getACPClient()
+                    .sendMessage(session, correctionJson)
+                    .collect { msg ->
+                        when (msg) {
+                            is com.acp.chat.domain.acp.ACPMessage.TextChunk -> accumulated += msg.text
+                            is com.acp.chat.domain.acp.ACPMessage.Complete -> { /* done */ }
+                            is com.acp.chat.domain.acp.ACPMessage.Error -> throw Exception(msg.message)
+                        }
+                    }
+                val corrected = parseCorrectedText(accumulated) ?: rawTranscript
+                _uiState.update { it.copy(voiceCorrectedText = corrected, isVoiceCorrectionPending = false) }
+            } catch (e: Exception) {
+                android.util.Log.w("ChatViewModel", "Voice correction failed, using raw transcript", e)
+                _uiState.update { it.copy(voiceCorrectedText = rawTranscript, isVoiceCorrectionPending = false) }
+            }
+        }
+    }
+
+    fun clearVoiceCorrectedText() {
+        _uiState.update { it.copy(voiceCorrectedText = null) }
+    }
+
+    private fun buildCorrectionJson(rawTranscript: String): String {
+        val escaped = rawTranscript
+            .replace("\\", "\\\\")
+            .replace("\"", "\\\"")
+            .replace("\n", "\\n")
+            .replace("\r", "\\r")
+            .replace("\t", "\\t")
+        return """{"type":"voice_correction_request","version":"1.0","instructions":"Fix transcription errors, punctuation, and grammar. Return ONLY valid JSON with a single field: {\"corrected_text\": \"...\"}","raw_transcript":"$escaped"}"""
+    }
+
+    private fun parseCorrectedText(json: String): String? {
+        return try {
+            val obj = org.json.JSONObject(json)
+            obj.optString("corrected_text").takeIf { it.isNotEmpty() }
+        } catch (e: Exception) {
+            null
         }
     }
 
