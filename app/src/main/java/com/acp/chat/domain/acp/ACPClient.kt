@@ -1,7 +1,6 @@
 package com.acp.chat.domain.acp
 
 import android.content.Context
-import android.content.SharedPreferences
 import android.util.Log
 import com.acp.chat.data.model.ConnectionConfig
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -56,26 +55,11 @@ class ACPClient @Inject constructor(
     private var agentCapabilities: AgentCapabilities? = null
     private var currentSessionId: SessionId? = null
 
-    private val prefs: SharedPreferences by lazy {
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-    }
-
     companion object {
-        private const val PREFS_NAME = "acp_client_prefs"
-        private const val KEY_SESSION_ID = "session_id"
+        private const val TAG = "ACPClient"
     }
 
-    /** Get the stored session ID from SharedPreferences */
-    private fun getStoredSessionId(): String? {
-        return prefs.getString(KEY_SESSION_ID, null)
-    }
 
-    /** Save the session ID to SharedPreferences */
-    private fun saveSessionId(sessionId: String) {
-        prefs.edit().putString(KEY_SESSION_ID, sessionId).apply()
-        Log.d("ACPClient", "💾 Saved session ID to SharedPreferences: $sessionId")
-    }
-    
     private val _connectionState = MutableStateFlow<ACPConnectionState>(ACPConnectionState.Disconnected)
     val connectionState: StateFlow<ACPConnectionState> = _connectionState.asStateFlow()
     
@@ -271,40 +255,18 @@ class ACPClient @Inject constructor(
         try {
             val currentClient = client ?: throw Exception("Not connected")
 
-            // Create operations factory with tool approval support
             val operationsFactory = createOperationsFactory()
-
-            // Get stored session ID to pass in _meta for session persistence
-            val storedSessionId = getStoredSessionId()
-            val meta = if (storedSessionId != null) {
-                Log.d("ACPClient", "📋 Passing stored session ID in _meta: $storedSessionId")
-                kotlinx.serialization.json.buildJsonObject {
-                    put("sessionId", kotlinx.serialization.json.JsonPrimitive(storedSessionId))
-                }
-            } else {
-                null
-            }
 
             val session = currentClient.newSession(
                 SessionCreationParameters(
                     cwd = currentConfig?.cwd ?: "/",
-                    mcpServers = emptyList(),
-                    _meta = meta
+                    mcpServers = emptyList()
                 ),
                 operationsFactory
             )
 
-            // Save the session ID for future use
-            val sessionId = session.sessionId.value
             currentSessionId = session.sessionId
-            saveSessionId(sessionId)
-
-            // Check if session was resumed (same ID as stored)
-            if (storedSessionId != null && sessionId == storedSessionId) {
-                Log.d("ACPClient", "🔄 Session resumed (reusing workspace folder)")
-            } else {
-                Log.d("ACPClient", "🆕 New session created")
-            }
+            Log.d(TAG, "🆕 New session created: ${session.sessionId.value}")
 
             Result.success(session)
         } catch (e: Exception) {
