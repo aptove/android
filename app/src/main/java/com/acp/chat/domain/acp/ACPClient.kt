@@ -33,7 +33,6 @@ import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManager
 import javax.net.ssl.X509TrustManager
 import kotlin.coroutines.cancellation.CancellationException
-import kotlin.math.pow
 import kotlin.time.Duration.Companion.seconds
 
 data class ToolApprovalRequest(
@@ -79,8 +78,6 @@ class ACPClient @Inject constructor(
      */
     var onSessionRefreshed: ((ClientSession) -> Unit)? = null
 
-    private var reconnectJob: Job? = null
-    private var reconnectAttempt = 0
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     
     /**
@@ -157,11 +154,10 @@ class ACPClient @Inject constructor(
         try {
             _connectionState.value = ACPConnectionState.Connecting
             currentConfig = config
-            reconnectAttempt = 0
-            
+
             // Close existing client if any
             httpClient?.close()
-            
+
             // Create new HTTP client with appropriate TLS settings
             val newHttpClient = createHttpClient(config)
             httpClient = newHttpClient
@@ -169,17 +165,18 @@ class ACPClient @Inject constructor(
             // Create protocol with WebSocket transport
             val wsUrl = config.toWebSocketUrl()
             val isLocalhost = wsUrl.contains("localhost") || wsUrl.contains("127.0.0.1") || wsUrl.contains("10.0.2.2")
-            
+
             val newProtocol = newHttpClient.acpProtocolOnClientWebSocket(
                 url = wsUrl,
-                protocolOptions = ProtocolOptions()
+                protocolOptions = ProtocolOptions(),
+                onClose = { handleDisconnect(null) }
             ) {
                 // Only send Cloudflare headers for remote connections with credentials
                 if (!isLocalhost && !config.clientId.isNullOrBlank() && !config.clientSecret.isNullOrBlank()) {
                     headers.append("CF-Access-Client-Id", config.clientId)
                     headers.append("CF-Access-Client-Secret", config.clientSecret)
                 }
-                
+
                 // Send bridge auth token if provided
                 if (!config.authToken.isNullOrBlank()) {
                     headers.append("X-Bridge-Token", config.authToken)
@@ -225,30 +222,11 @@ class ACPClient @Inject constructor(
     }
 
     private fun handleDisconnect(error: Throwable?) {
+        // Null out protocol/client so any pending calls fail fast.
+        // AgentManager observes connectionState and will drive multi-transport reconnect.
         protocol = null
         client = null
-        
-        if (reconnectAttempt < 5) {
-            _connectionState.value = ACPConnectionState.Reconnecting
-            attemptReconnect()
-        } else {
-            _connectionState.value = ACPConnectionState.Error(
-                message = "Connection lost",
-                cause = error
-            )
-        }
-    }
-
-    private fun attemptReconnect() {
-        reconnectJob?.cancel()
-        val config = currentConfig ?: return
-        
-        reconnectJob = scope.launch {
-            val delay = (2.0.pow(reconnectAttempt).toLong() * 1000).coerceAtMost(16000)
-            delay(delay)
-            reconnectAttempt++
-            connect(config)
-        }
+        _connectionState.value = ACPConnectionState.Disconnected
     }
 
     suspend fun createSession(): Result<ClientSession> = withContext(Dispatchers.IO) {
@@ -603,7 +581,6 @@ class ACPClient @Inject constructor(
     }
 
     suspend fun disconnect() {
-        reconnectJob?.cancel()
         // Cancel all pending approvals
         pendingApprovals.values.forEach { it.cancel() }
         pendingApprovals.clear()
@@ -643,7 +620,6 @@ class ACPClient @Inject constructor(
     }
 
     fun cleanup() {
-        reconnectJob?.cancel()
         pendingApprovals.values.forEach { it.cancel() }
         pendingApprovals.clear()
         scope.cancel()

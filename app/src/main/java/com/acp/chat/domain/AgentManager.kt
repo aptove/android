@@ -10,11 +10,16 @@ import com.acp.chat.data.model.ConnectionStatus
 import com.acp.chat.data.model.TransportEndpoint
 import com.acp.chat.data.repository.AgentRepository
 import com.acp.chat.domain.acp.ACPClient
+import com.acp.chat.domain.acp.ACPConnectionState
 import com.acp.chat.service.PushTokenManager
 import com.agentclientprotocol.client.ClientSession
 import com.agentclientprotocol.model.SessionId
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
@@ -59,8 +64,31 @@ class AgentManager @Inject constructor(
     private fun getMutex(agentId: String): Mutex =
         agentMutexes.computeIfAbsent(agentId) { Mutex() }
 
+    /** The agent currently using ACPClient's WebSocket connection. */
+    @Volatile private var currentAgentId: String? = null
+
+    private val managerScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     companion object {
         private const val TAG = "AgentManager"
+    }
+
+    init {
+        // Observe ACPClient connection state. When the WebSocket closes unexpectedly
+        // (e.g. network switch), clear the stale session and immediately retry via all
+        // available transports so the app switches to the working one automatically.
+        managerScope.launch {
+            acpClient.connectionState.collect { state ->
+                if (state is ACPConnectionState.Disconnected) {
+                    val agentId = currentAgentId ?: return@collect
+                    Log.w(TAG, "🔌 Transport closed unexpectedly for $agentId — retrying all transports")
+                    currentAgentId = null
+                    sessionCache.remove(agentId)
+                    repository.updateConnectionStatus(agentId, ConnectionStatus.DISCONNECTED)
+                    managerScope.launch { connectAgent(agentId) }
+                }
+            }
+        }
     }
 
     // MARK: - Reactive Queries (delegate to repository)
@@ -157,6 +185,10 @@ class AgentManager @Inject constructor(
         return try {
             acpClient.connect(config)
 
+            // Track which agent owns the current WebSocket so the connectionState
+            // observer can trigger multi-transport reconnect on unexpected close.
+            currentAgentId = agentId
+
             val storedSessionId = agent?.activeSessionId
             val supportsLoad = acpClient.supportsLoadSession()
 
@@ -217,6 +249,9 @@ class AgentManager @Inject constructor(
     }
 
     suspend fun disconnectFromAgent(agentId: String) {
+        // Clear currentAgentId first so the connectionState observer does not
+        // trigger an automatic reconnect for this intentional disconnect.
+        if (currentAgentId == agentId) currentAgentId = null
         repository.updateConnectionStatus(agentId, ConnectionStatus.DISCONNECTED)
         sessionCache.remove(agentId)
         Log.d(TAG, "🔌 Disconnected from agent: $agentId")
@@ -304,6 +339,7 @@ class AgentManager @Inject constructor(
      */
     suspend fun updateAgentCredentials(agentId: String, config: ConnectionConfig) {
         Log.d(TAG, "📝 Updating credentials for agent $agentId")
+        if (currentAgentId == agentId) currentAgentId = null
         sessionCache.remove(agentId)
         acpClient.disconnect()
         credentialStorage.saveCredentials(agentId, config)
