@@ -106,7 +106,8 @@ class ConnectAgentUseCase @Inject constructor(
                 protocolVersion = config.version,
                 connectionStatus = ConnectionStatus.CONNECTED,
                 lastConnectedAt = System.currentTimeMillis(),
-                bridgeAgentId = bridgeAgentId
+                bridgeAgentId = bridgeAgentId,
+                cwd = config.cwd
             )
 
             agentManager.addAgent(agent, config)

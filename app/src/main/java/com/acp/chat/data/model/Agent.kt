@@ -31,5 +31,7 @@ data class Agent(
     /** Stable UUID from the bridge; null for legacy agents (no bridgeAgentId in QR). */
     val bridgeAgentId: String? = null,
     /** User-selected preferred transport (e.g. "tailscale-serve", "cloudflare", "local"). */
-    val preferredTransport: String? = null
+    val preferredTransport: String? = null,
+    /** The working directory where the bridge was started, sent during pairing. */
+    val cwd: String = "/"
 )

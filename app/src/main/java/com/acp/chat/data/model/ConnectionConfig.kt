@@ -10,7 +10,9 @@ data class ConnectionConfig(
     val authToken: String? = null,
     val certFingerprint: String? = null,
     val protocol: String = "acp",
-    val version: String = "1.0"
+    val version: String = "1.0",
+    /** The working directory where the bridge was started. */
+    val cwd: String = "/"
 ) {
     fun toWebSocketUrl(): String {
         return url.replace("https://", "wss://").replace("http://", "ws://")

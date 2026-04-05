@@ -119,6 +119,10 @@ class AgentManager @Inject constructor(
                 clientSecret = config.clientSecret
             )
         )
+        // Update cwd from the pairing response
+        repository.getAgentById(agentId)?.let { agent ->
+            repository.updateAgent(agent.copy(cwd = config.cwd))
+        }
         Log.d(TAG, "📍 Upserted transport endpoint: $transport → ${config.url}")
     }
 
@@ -303,6 +307,10 @@ class AgentManager @Inject constructor(
         sessionCache.remove(agentId)
         acpClient.disconnect()
         credentialStorage.saveCredentials(agentId, config)
+        // Update cwd from the new pairing response
+        repository.getAgentById(agentId)?.let { agent ->
+            repository.updateAgent(agent.copy(cwd = config.cwd))
+        }
         repository.clearSessionInfo(agentId)
         repository.updateConnectionStatus(agentId, ConnectionStatus.DISCONNECTED)
         Log.d(TAG, "✅ Credentials updated for agent $agentId")

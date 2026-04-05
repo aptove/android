@@ -124,7 +124,8 @@ data class PairingResponse(
     val version: String,
     val authToken: String,
     val certFingerprint: String? = null,
-    val agentId: String? = null
+    val agentId: String? = null,
+    val cwd: String = "/"
 )
 
 /**
@@ -262,7 +263,8 @@ class PairingService @Inject constructor() {
                         authToken = pairingResponse.authToken,
                         certFingerprint = pairingResponse.certFingerprint ?: actualFingerprint,
                         protocol = pairingResponse.protocol,
-                        version = pairingResponse.version
+                        version = pairingResponse.version,
+                        cwd = pairingResponse.cwd
                     )
                     
                     Log.d(TAG, "✅ Pairing successful, got WebSocket URL: ${config.url}")
@@ -357,7 +359,8 @@ class PairingService @Inject constructor() {
                             authToken = pairingResponse.authToken,
                             certFingerprint = null, // serve mode: no pinning needed
                             protocol = pairingResponse.protocol,
-                            version = pairingResponse.version
+                            version = pairingResponse.version,
+                            cwd = pairingResponse.cwd
                         )
                         Log.d(TAG, "✅ Tailscale pairing successful: ${config.url}")
                         PairingResult.Success(config, bridgeAgentId = pairingResponse.agentId, transport = "tailscale-serve")
@@ -426,7 +429,8 @@ class PairingService @Inject constructor() {
                         authToken = pairingResponse.authToken,
                         certFingerprint = null, // No cert pinning for Cloudflare
                         protocol = pairingResponse.protocol,
-                        version = pairingResponse.version
+                        version = pairingResponse.version,
+                        cwd = pairingResponse.cwd
                     )
 
                     Log.d(TAG, "✅ Cloudflare pairing successful: ${config.url}")
