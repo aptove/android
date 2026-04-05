@@ -62,11 +62,17 @@ class ConnectAgentUseCase @Inject constructor(
             if (!bridgeAgentId.isNullOrBlank()) {
                 val existingByBridgeId = agentManager.findAgentByBridgeAgentId(bridgeAgentId)
                 if (existingByBridgeId != null) {
-                    Log.d(TAG, "Bridge agent $bridgeAgentId already registered as ${existingByBridgeId.agentId}, adding transport endpoint")
-                    agentManager.addOrUpdateTransportEndpoint(existingByBridgeId.agentId, transport, config)
-                    val connectResult = agentManager.connectAgent(existingByBridgeId.agentId)
+                    val agentId = existingByBridgeId.agentId
+                    Log.d(TAG, "Bridge agent $bridgeAgentId already registered as $agentId, adding transport endpoint")
+                    agentManager.addOrUpdateTransportEndpoint(agentId, transport, config)
+                    // User explicitly scanned this transport — make it preferred and force a
+                    // fresh reconnect so the correct endpoint becomes active and the UI reflects it.
+                    agentManager.setPreferredTransport(agentId, transport)
+                    agentManager.disconnectFromAgent(agentId)
+                    agentManager.getACPClient().disconnect()
+                    val connectResult = agentManager.connectAgent(agentId)
                     return if (connectResult.isSuccess) {
-                        agentManager.updateConnectionStatus(existingByBridgeId.agentId, ConnectionStatus.CONNECTED)
+                        agentManager.updateConnectionStatus(agentId, ConnectionStatus.CONNECTED)
                         Result.success(existingByBridgeId.copy(connectionStatus = ConnectionStatus.CONNECTED))
                     } else {
                         Result.failure(connectResult.exceptionOrNull() ?: Exception("Connection failed"))
