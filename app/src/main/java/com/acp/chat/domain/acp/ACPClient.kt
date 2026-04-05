@@ -13,6 +13,7 @@ import com.agentclientprotocol.client.ClientSession
 import com.agentclientprotocol.common.Event
 import com.agentclientprotocol.common.SessionCreationParameters
 import com.agentclientprotocol.model.*
+import com.agentclientprotocol.protocol.JsonRpcException
 import com.agentclientprotocol.protocol.Protocol
 import com.agentclientprotocol.protocol.ProtocolOptions
 import com.agentclientprotocol.rpc.JsonRpcNotification
@@ -286,8 +287,8 @@ class ACPClient @Inject constructor(
 
             val session = currentClient.newSession(
                 SessionCreationParameters(
-                    cwd = "/tmp",  // Current working directory for the session
-                    mcpServers = emptyList(), // No MCP servers for simple chat
+                    cwd = currentConfig?.cwd ?: "/",
+                    mcpServers = emptyList(),
                     _meta = meta
                 ),
                 operationsFactory
@@ -329,7 +330,7 @@ class ACPClient @Inject constructor(
             val session = currentClient.loadSession(
                 sessionId = sessionId,
                 sessionParameters = SessionCreationParameters(
-                    cwd = "/tmp",
+                    cwd = currentConfig?.cwd ?: "/",
                     mcpServers = emptyList()
                 ),
                 operationsFactory = operationsFactory
@@ -549,6 +550,12 @@ class ACPClient @Inject constructor(
                 return@flow
             } catch (e: CancellationException) {
                 throw e // Never swallow cancellation
+            } catch (e: JsonRpcException) {
+                // Agent-side JSON-RPC errors (quota exceeded, invalid request, etc.)
+                // should NOT trigger reconnect — surface the message directly.
+                Log.w("ACPClient", "⚠️ Agent error (no reconnect): ${e.message}")
+                emit(ACPMessage.Error(e.message))
+                return@flow
             } catch (e: Exception) {
                 Log.e("ACPClient", "❌ sendMessage attempt ${attempt + 1} failed: ${e.message}", e)
                 lastError = e

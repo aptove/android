@@ -27,6 +27,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.acp.chat.R
 import com.acp.chat.data.model.Message
 import com.acp.chat.data.model.MessageSender
+import com.acp.chat.data.model.MessageStatus
 import com.acp.chat.data.model.MessageType
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -342,6 +343,9 @@ private fun MessageBubble(
     }
 
     // Regular text message
+    val isError = message.status == MessageStatus.ERROR && !message.error.isNullOrBlank()
+    val displayText = if (message.text.isBlank() && isError) message.error!! else message.text
+
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start
@@ -356,16 +360,20 @@ private fun MessageBubble(
             ),
             color = if (isUser) {
                 MaterialTheme.colorScheme.primary
+            } else if (isError) {
+                MaterialTheme.colorScheme.errorContainer
             } else {
                 MaterialTheme.colorScheme.surfaceVariant
             }
         ) {
             Column(modifier = Modifier.padding(12.dp)) {
                 Text(
-                    text = message.text,
+                    text = displayText,
                     style = MaterialTheme.typography.bodyLarge,
                     color = if (isUser) {
                         MaterialTheme.colorScheme.onPrimary
+                    } else if (isError) {
+                        MaterialTheme.colorScheme.onErrorContainer
                     } else {
                         MaterialTheme.colorScheme.onSurfaceVariant
                     }
