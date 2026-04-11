@@ -7,6 +7,7 @@ import com.acp.chat.data.model.MessageStatus
 import com.acp.chat.domain.acp.ACPClient
 import com.acp.chat.domain.acp.ACPMessage
 import com.agentclientprotocol.client.ClientSession
+import com.agentclientprotocol.model.ContentBlock
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
@@ -31,13 +32,23 @@ class MessageRepository @Inject constructor(
     suspend fun sendMessage(
         agentId: String,
         session: ClientSession,
-        text: String
+        text: String,
+        images: List<ContentBlock.Image> = emptyList(),
+        userMessageId: String = UUID.randomUUID().toString()
     ): Result<Flow<Message>> {
+        // Build content blocks: images first, then text
+        val contentBlocks = mutableListOf<ContentBlock>()
+        contentBlocks.addAll(images)
+        if (text.isNotBlank()) contentBlocks.add(ContentBlock.Text(text))
+
+        // Use a placeholder text if images-only message
+        val displayText = if (text.isBlank() && images.isNotEmpty()) "📎 Image" else text
+
         // Create user message
         val userMessage = Message(
-            id = UUID.randomUUID().toString(),
+            id = userMessageId,
             agentId = agentId,
-            text = text,
+            text = displayText,
             sender = MessageSender.USER,
             status = MessageStatus.SENDING
         )
@@ -60,7 +71,7 @@ class MessageRepository @Inject constructor(
             messageDao.insertMessage(agentMessage)
 
             // Send via ACP and collect streaming response
-            val messageFlow = acpClient.sendMessage(session, text)
+            val messageFlow = acpClient.sendMessage(session, contentBlocks)
                 .map { acpMessage ->
                     when (acpMessage) {
                         is ACPMessage.TextChunk -> {

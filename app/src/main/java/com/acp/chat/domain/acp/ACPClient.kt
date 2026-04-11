@@ -364,11 +364,7 @@ class ACPClient @Inject constructor(
         }
     }
 
-    suspend fun sendMessage(session: ClientSession, text: String): Flow<ACPMessage> = flow {
-        val contentBlocks = listOf(
-            ContentBlock.Text(text = text)
-        )
-
+    suspend fun sendMessage(session: ClientSession, contentBlocks: List<ContentBlock>): Flow<ACPMessage> = flow {
         var currentSession = session
         var lastError: Throwable? = null
 

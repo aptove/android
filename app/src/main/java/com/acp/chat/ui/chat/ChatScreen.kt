@@ -1,13 +1,17 @@
 package com.acp.chat.ui.chat
 
 import android.Manifest
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -15,15 +19,18 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import coil.compose.AsyncImage
 import com.acp.chat.R
 import com.acp.chat.data.model.Message
 import com.acp.chat.data.model.MessageSender
@@ -52,6 +59,12 @@ fun ChatScreen(
         if (granted) {
             voiceInputViewModel.startRecording()
         }
+    }
+
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickMultipleVisualMedia(maxItems = 10)
+    ) { uris ->
+        if (uris.isNotEmpty()) viewModel.onImagesSelected(uris)
     }
 
     LaunchedEffect(rawTranscript) {
@@ -123,7 +136,14 @@ fun ChatScreen(
                 },
                 isRecording = voiceState is RecordingState.Recording,
                 isCorrectionPending = uiState.isVoiceCorrectionPending,
-                enabled = !uiState.isSending
+                enabled = !uiState.isSending,
+                selectedImages = uiState.selectedImageUris,
+                onPickImages = {
+                    photoPickerLauncher.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                    )
+                },
+                onRemoveImage = viewModel::removeImage
             )
         }
     ) { padding ->
@@ -178,7 +198,7 @@ private fun MessageBubble(
 ) {
     val isUser = message.sender == MessageSender.USER
     val uiState by viewModel.uiState.collectAsState()
-    
+
     // Tool approval message styling
     if (message.type == MessageType.TOOL_APPROVAL_REQUEST) {
         Column(
@@ -198,17 +218,17 @@ private fun MessageBubble(
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onTertiaryContainer
                     )
-                    
+
                     val toolApproval = message.toolApproval
                     if (toolApproval != null) {
                         // Show buttons if not yet decided
                         if (toolApproval.approved == null) {
                             Spacer(modifier = Modifier.height(12.dp))
-                            
+
                             // Get available options from the ViewModel state
                             val options = uiState.pendingApprovalOptions[message.id]
                             android.util.Log.d("ChatScreen", "Rendering approval for message ${message.id}, options: ${options?.size}")
-                            
+
                             if (!options.isNullOrEmpty()) {
                                 // Display all available options dynamically
                                 Column(
@@ -218,7 +238,7 @@ private fun MessageBubble(
                                     options.forEach { option ->
                                         val isAllowOption = option.kind.startsWith("allow")
                                         val isRejectOption = option.kind.startsWith("reject")
-                                        
+
                                         if (isAllowOption) {
                                             // Allow options (green button)
                                             Button(
@@ -263,7 +283,7 @@ private fun MessageBubble(
                                             }
                                         }
                                     }
-                                    
+
                                     // Always show a cancel button at the bottom
                                     Spacer(modifier = Modifier.height(4.dp))
                                     OutlinedButton(
@@ -297,7 +317,7 @@ private fun MessageBubble(
                                         Spacer(modifier = Modifier.width(4.dp))
                                         Text("Approve")
                                     }
-                                    
+
                                     OutlinedButton(
                                         onClick = { viewModel.rejectTool(message.id) },
                                         modifier = Modifier.weight(1f),
@@ -345,6 +365,7 @@ private fun MessageBubble(
     // Regular text message
     val isError = message.status == MessageStatus.ERROR && !message.error.isNullOrBlank()
     val displayText = if (message.text.isBlank() && isError) message.error!! else message.text
+    val imageUris = if (isUser) uiState.imageUrisByMessageId[message.id] else null
 
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -367,18 +388,42 @@ private fun MessageBubble(
             }
         ) {
             Column(modifier = Modifier.padding(12.dp)) {
-                Text(
-                    text = displayText,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = if (isUser) {
-                        MaterialTheme.colorScheme.onPrimary
-                    } else if (isError) {
-                        MaterialTheme.colorScheme.onErrorContainer
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
+                // Image thumbnails above text
+                if (!imageUris.isNullOrEmpty()) {
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.padding(bottom = if (displayText.isNotBlank()) 8.dp else 0.dp)
+                    ) {
+                        items(imageUris) { uri ->
+                            AsyncImage(
+                                model = uri,
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .size(80.dp)
+                                    .background(
+                                        Color.Black.copy(alpha = 0.1f),
+                                        RoundedCornerShape(8.dp)
+                                    )
+                            )
+                        }
                     }
-                )
-                
+                }
+
+                if (displayText.isNotBlank()) {
+                    Text(
+                        text = displayText,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = if (isUser) {
+                            MaterialTheme.colorScheme.onPrimary
+                        } else if (isError) {
+                            MaterialTheme.colorScheme.onErrorContainer
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+                    )
+                }
+
                 val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
                 Text(
                     text = timeFormat.format(Date(message.timestamp)),
@@ -404,61 +449,121 @@ private fun MessageInputBar(
     onVoiceInput: () -> Unit,
     isRecording: Boolean,
     isCorrectionPending: Boolean,
-    enabled: Boolean
+    enabled: Boolean,
+    selectedImages: List<Uri>,
+    onPickImages: () -> Unit,
+    onRemoveImage: (Int) -> Unit
 ) {
     Surface(
         tonalElevation = 3.dp
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(8.dp)
         ) {
-            TextField(
-                value = inputText,
-                onValueChange = onInputTextChange,
-                modifier = Modifier.weight(1f),
-                placeholder = { Text(stringResource(R.string.message_hint)) },
-                enabled = enabled,
-                maxLines = 4
-            )
-
-            AnimatedContent(
-                targetState = inputText.isEmpty(),
-                label = "voice_send_toggle"
-            ) { isEmpty ->
-                if (isEmpty) {
-                    IconButton(
-                        onClick = onVoiceInput,
-                        enabled = enabled && !isCorrectionPending
-                    ) {
-                        when {
-                            isRecording -> Icon(
-                                Icons.Filled.Mic,
-                                contentDescription = "Stop recording",
-                                tint = MaterialTheme.colorScheme.error
+            // Image thumbnail strip
+            if (selectedImages.isNotEmpty()) {
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp)
+                ) {
+                    itemsIndexed(selectedImages) { index, uri ->
+                        Box {
+                            AsyncImage(
+                                model = uri,
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .size(64.dp)
+                                    .background(
+                                        MaterialTheme.colorScheme.surfaceVariant,
+                                        RoundedCornerShape(8.dp)
+                                    )
                             )
-                            isCorrectionPending -> CircularProgressIndicator(
-                                modifier = Modifier.size(24.dp),
-                                strokeWidth = 2.dp
-                            )
-                            else -> Text(
-                                "🎙️",
-                                style = MaterialTheme.typography.titleLarge
-                            )
+                            IconButton(
+                                onClick = { onRemoveImage(index) },
+                                modifier = Modifier
+                                    .size(20.dp)
+                                    .align(Alignment.TopEnd)
+                                    .background(
+                                        MaterialTheme.colorScheme.surface.copy(alpha = 0.8f),
+                                        RoundedCornerShape(10.dp)
+                                    )
+                            ) {
+                                Icon(
+                                    Icons.Default.Close,
+                                    contentDescription = "Remove image",
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
                         }
                     }
-                } else {
-                    IconButton(
-                        onClick = onSendMessage,
-                        enabled = enabled && inputText.isNotBlank()
-                    ) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.Send,
-                            contentDescription = stringResource(R.string.send_message)
-                        )
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Photo picker button
+                IconButton(
+                    onClick = onPickImages,
+                    enabled = enabled
+                ) {
+                    Icon(
+                        Icons.Default.Image,
+                        contentDescription = "Pick images"
+                    )
+                }
+
+                TextField(
+                    value = inputText,
+                    onValueChange = onInputTextChange,
+                    modifier = Modifier.weight(1f),
+                    placeholder = { Text(stringResource(R.string.message_hint)) },
+                    enabled = enabled,
+                    maxLines = 4
+                )
+
+                AnimatedContent(
+                    targetState = inputText.isEmpty() && selectedImages.isEmpty(),
+                    label = "voice_send_toggle"
+                ) { showMic ->
+                    if (showMic) {
+                        IconButton(
+                            onClick = onVoiceInput,
+                            enabled = enabled && !isCorrectionPending
+                        ) {
+                            when {
+                                isRecording -> Icon(
+                                    Icons.Filled.Mic,
+                                    contentDescription = "Stop recording",
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                                isCorrectionPending -> CircularProgressIndicator(
+                                    modifier = Modifier.size(24.dp),
+                                    strokeWidth = 2.dp
+                                )
+                                else -> Text(
+                                    "🎙️",
+                                    style = MaterialTheme.typography.titleLarge
+                                )
+                            }
+                        }
+                    } else {
+                        IconButton(
+                            onClick = onSendMessage,
+                            enabled = enabled && (inputText.isNotBlank() || selectedImages.isNotEmpty())
+                        ) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.Send,
+                                contentDescription = stringResource(R.string.send_message)
+                            )
+                        }
                     }
                 }
             }

@@ -135,6 +135,9 @@ dependencies {
     implementation("androidx.camera:camera-view:$cameraxVersion")
     implementation("androidx.camera:camera-mlkit-vision:$cameraxVersion")
 
+    // Coil for image loading
+    implementation("io.coil-kt:coil-compose:2.7.0")
+
     // DataStore for simple preferences
     implementation("androidx.datastore:datastore-preferences:1.0.0")
 

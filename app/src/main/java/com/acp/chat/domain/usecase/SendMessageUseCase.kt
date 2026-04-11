@@ -3,7 +3,9 @@ package com.acp.chat.domain.usecase
 import com.acp.chat.data.model.Message
 import com.acp.chat.data.repository.MessageRepository
 import com.agentclientprotocol.client.ClientSession
+import com.agentclientprotocol.model.ContentBlock
 import kotlinx.coroutines.flow.Flow
+import java.util.UUID
 import javax.inject.Inject
 
 class SendMessageUseCase @Inject constructor(
@@ -12,9 +14,11 @@ class SendMessageUseCase @Inject constructor(
     suspend operator fun invoke(
         agentId: String,
         session: ClientSession,
-        text: String
+        text: String,
+        images: List<ContentBlock.Image> = emptyList(),
+        userMessageId: String = UUID.randomUUID().toString()
     ): Result<Flow<Message>> {
-        if (text.isBlank()) {
+        if (text.isBlank() && images.isEmpty()) {
             return Result.failure(Exception("Message cannot be empty"))
         }
 
@@ -22,6 +26,6 @@ class SendMessageUseCase @Inject constructor(
             return Result.failure(Exception("Message too long (max 10,000 characters)"))
         }
 
-        return messageRepository.sendMessage(agentId, session, text)
+        return messageRepository.sendMessage(agentId, session, text, images, userMessageId)
     }
 }

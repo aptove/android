@@ -1,5 +1,10 @@
 package com.acp.chat.ui.chat
 
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.net.Uri
+import android.util.Base64
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -13,9 +18,15 @@ import com.acp.chat.data.repository.MessageRepository
 import com.acp.chat.domain.AgentManager
 import com.acp.chat.domain.usecase.SendMessageUseCase
 import com.agentclientprotocol.client.ClientSession
+import com.agentclientprotocol.model.ContentBlock
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.ByteArrayOutputStream
+import java.util.UUID
 import javax.inject.Inject
 
 data class ChatUiState(
@@ -30,6 +41,8 @@ data class ChatUiState(
     val showSessionIndicator: Boolean = false,
     val isVoiceCorrectionPending: Boolean = false,
     val voiceCorrectedText: String? = null,
+    val selectedImageUris: List<Uri> = emptyList(),
+    val imageUrisByMessageId: Map<String, List<Uri>> = emptyMap(),
 )
 
 @HiltViewModel
@@ -37,7 +50,8 @@ class ChatViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val agentManager: AgentManager,
     private val messageRepository: MessageRepository,
-    private val sendMessageUseCase: SendMessageUseCase
+    private val sendMessageUseCase: SendMessageUseCase,
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val agentId: String = checkNotNull(savedStateHandle["agentId"])
@@ -72,7 +86,7 @@ class ChatViewModel @Inject constructor(
                 }
         }
     }
-    
+
     private fun setupToolApprovalHandler() {
         viewModelScope.launch {
             val acpClient = agentManager.getACPClient()
@@ -100,7 +114,7 @@ class ChatViewModel @Inject constructor(
                         toolApproved = null
                     )
                     messageRepository.insertMessage(approvalMessage)
-                    
+
                     // Store options in memory mapped to message ID
                     _uiState.update { state ->
                         val newOptionsMap = state.pendingApprovalOptions.toMutableMap()
@@ -120,19 +134,19 @@ class ChatViewModel @Inject constructor(
                 val connectionResult = result.getOrNull()!!
                 val session = connectionResult.session
                 val wasResumed = connectionResult.wasResumed
-                
-                _uiState.update { 
+
+                _uiState.update {
                     it.copy(
                         session = session,
                         sessionResumed = wasResumed,
                         showSessionIndicator = true
                     )
                 }
-                
+
                 // Hide session indicator after 3 seconds
                 kotlinx.coroutines.delay(3000)
                 _uiState.update { it.copy(showSessionIndicator = false) }
-                
+
                 // Send conversation history to the agent for context
                 if (!wasResumed) {
                     sendConversationHistory(session)
@@ -142,11 +156,11 @@ class ChatViewModel @Inject constructor(
             }
         }
     }
-    
+
     private suspend fun sendConversationHistory(session: ClientSession) {
         val messages = _uiState.value.messages
         if (messages.isEmpty()) return
-        
+
         // Build a context message with recent conversation history
         val historyText = buildString {
             append("Here is our previous conversation for context:\n\n")
@@ -158,9 +172,9 @@ class ChatViewModel @Inject constructor(
             }
             append("Please continue from where we left off.")
         }
-        
+
         android.util.Log.d("ChatViewModel", "Sending conversation history with ${messages.size} messages")
-        
+
         // Send history as a system-like message (user message with context flag)
         try {
             sendMessageUseCase(
@@ -177,23 +191,64 @@ class ChatViewModel @Inject constructor(
         _uiState.update { it.copy(inputText = text) }
     }
 
+    fun onImagesSelected(uris: List<Uri>) {
+        _uiState.update { it.copy(selectedImageUris = it.selectedImageUris + uris) }
+    }
+
+    fun removeImage(index: Int) {
+        _uiState.update { state ->
+            val updated = state.selectedImageUris.toMutableList().also { it.removeAt(index) }
+            state.copy(selectedImageUris = updated)
+        }
+    }
+
     fun sendMessage() {
         val text = _uiState.value.inputText.trim()
+        val selectedUris = _uiState.value.selectedImageUris
         val session = _uiState.value.session
 
-        if (text.isEmpty() || session == null) return
+        if ((text.isEmpty() && selectedUris.isEmpty()) || session == null) return
+
+        val userMsgId = UUID.randomUUID().toString()
 
         viewModelScope.launch {
-            _uiState.update { it.copy(isSending = true, inputText = "") }
+            // Convert URIs to base64 JPEG in IO
+            val imageBlocks = withContext(Dispatchers.IO) {
+                selectedUris.mapNotNull { uri ->
+                    try {
+                        val inputStream = context.contentResolver.openInputStream(uri) ?: return@mapNotNull null
+                        val bitmap = BitmapFactory.decodeStream(inputStream)
+                        inputStream.close()
+                        val outputStream = ByteArrayOutputStream()
+                        bitmap.compress(Bitmap.CompressFormat.JPEG, 80, outputStream)
+                        val base64 = Base64.encodeToString(outputStream.toByteArray(), Base64.NO_WRAP)
+                        ContentBlock.Image(data = base64, mimeType = "image/jpeg")
+                    } catch (e: Exception) {
+                        android.util.Log.w("ChatViewModel", "Failed to encode image: ${e.message}")
+                        null
+                    }
+                }
+            }
+
+            // Save URI mapping for in-session display before clearing
+            if (selectedUris.isNotEmpty()) {
+                _uiState.update { state ->
+                    state.copy(imageUrisByMessageId = state.imageUrisByMessageId + (userMsgId to selectedUris))
+                }
+            }
+
+            _uiState.update { it.copy(isSending = true, inputText = "", selectedImageUris = emptyList()) }
 
             val result = sendMessageUseCase(
                 agentId = agentId,
                 session = session,
-                text = text
+                text = text,
+                images = imageBlocks,
+                userMessageId = userMsgId
             )
 
             if (result.isFailure) {
-                _uiState.update { 
+                _uiState.update {
                     it.copy(
                         isSending = false,
                         error = result.exceptionOrNull()?.message
@@ -212,7 +267,7 @@ class ChatViewModel @Inject constructor(
     fun clearError() {
         _uiState.update { it.copy(error = null) }
     }
-    
+
     fun approveTool(messageId: String, optionId: String) {
         viewModelScope.launch {
             val message = _uiState.value.messages.find { it.id == messageId }
@@ -220,18 +275,18 @@ class ChatViewModel @Inject constructor(
                 android.util.Log.w("ChatViewModel", "⚠️ No toolCallId found for message: $messageId")
                 return@launch
             }
-            
+
             android.util.Log.d("ChatViewModel", "✅ Approving tool: $toolCallId with option: $optionId")
-            
+
             // Update message in DB with approved status
             val isApproved = optionId.contains("allow", ignoreCase = true)
             val updatedMessage = message.copy(toolApproved = isApproved)
             messageRepository.insertMessage(updatedMessage)
-            
+
             // Resume the continuation in ACPClient with selected option
             val acpClient = agentManager.getACPClient()
             acpClient.approveTool(toolCallId, optionId)
-            
+
             // Clean up options from memory
             _uiState.update { state ->
                 val newOptionsMap = state.pendingApprovalOptions.toMutableMap()
@@ -240,7 +295,7 @@ class ChatViewModel @Inject constructor(
             }
         }
     }
-    
+
     fun rejectTool(messageId: String) {
         viewModelScope.launch {
             val message = _uiState.value.messages.find { it.id == messageId }
@@ -248,17 +303,17 @@ class ChatViewModel @Inject constructor(
                 android.util.Log.w("ChatViewModel", "⚠️ No toolCallId found for message: $messageId")
                 return@launch
             }
-            
+
             android.util.Log.d("ChatViewModel", "❌ Rejecting tool: $toolCallId")
-            
+
             // Update message in DB with rejected status
             val updatedMessage = message.copy(toolApproved = false)
             messageRepository.insertMessage(updatedMessage)
-            
+
             // Resume the continuation in ACPClient with cancellation
             val acpClient = agentManager.getACPClient()
             acpClient.rejectTool(toolCallId)
-            
+
             // Clean up options from memory
             _uiState.update { state ->
                 val newOptionsMap = state.pendingApprovalOptions.toMutableMap()
@@ -279,7 +334,7 @@ class ChatViewModel @Inject constructor(
             var accumulated = ""
             try {
                 agentManager.getACPClient()
-                    .sendMessage(session, correctionJson)
+                    .sendMessage(session, listOf(ContentBlock.Text(correctionJson)))
                     .collect { msg ->
                         when (msg) {
                             is com.acp.chat.domain.acp.ACPMessage.TextChunk -> accumulated += msg.text
