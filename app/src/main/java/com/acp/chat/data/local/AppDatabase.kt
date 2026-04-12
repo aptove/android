@@ -11,7 +11,7 @@ import com.acp.chat.data.model.TransportEndpoint
 
 @Database(
     entities = [Agent::class, Message::class, TransportEndpoint::class],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -47,6 +47,12 @@ abstract class AppDatabase : RoomDatabase() {
         val MIGRATION_5_6 = object : Migration(5, 6) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE agents ADD COLUMN cwd TEXT NOT NULL DEFAULT '/'")
+            }
+        }
+
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE messages ADD COLUMN toolOptions TEXT")
             }
         }
     }

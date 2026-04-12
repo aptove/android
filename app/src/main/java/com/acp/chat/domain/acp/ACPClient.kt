@@ -447,7 +447,10 @@ class ACPClient @Inject constructor(
                                         }
                                     }
                                     is SessionUpdate.AgentThoughtChunk -> {
-                                        // Could handle thought display
+                                        val thoughtText = (update.content as? ContentBlock.Text)?.text ?: ""
+                                        if (thoughtText.isNotEmpty()) {
+                                            emit(ACPMessage.Thought(thoughtText))
+                                        }
                                     }
                                     is SessionUpdate.ToolCall -> {
                                         val toolInfo = buildString {
@@ -460,7 +463,7 @@ class ACPClient @Inject constructor(
                                                 append("\n📤 Output:\n```json\n$it\n```\n")
                                             }
                                         }
-                                        emit(ACPMessage.TextChunk(toolInfo, isComplete = false))
+                                        emit(ACPMessage.ToolStatus(toolInfo))
                                     }
                                     is SessionUpdate.ToolCallUpdate -> {
                                         val toolInfo = buildString {
@@ -472,7 +475,7 @@ class ACPClient @Inject constructor(
                                                 append("\n📤 Output:\n```json\n$it\n```\n")
                                             }
                                         }
-                                        emit(ACPMessage.TextChunk(toolInfo, isComplete = false))
+                                        emit(ACPMessage.ToolStatusUpdate(toolInfo))
                                     }
                                     else -> { /* Handle other update types */ }
                                 }

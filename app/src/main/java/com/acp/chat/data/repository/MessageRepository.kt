@@ -4,13 +4,14 @@ import com.acp.chat.data.local.MessageDao
 import com.acp.chat.data.model.Message
 import com.acp.chat.data.model.MessageSender
 import com.acp.chat.data.model.MessageStatus
+import com.acp.chat.data.model.MessageType
 import com.acp.chat.domain.acp.ACPClient
 import com.acp.chat.domain.acp.ACPMessage
 import com.agentclientprotocol.client.ClientSession
 import com.agentclientprotocol.model.ContentBlock
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.transform
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -70,12 +71,15 @@ class MessageRepository @Inject constructor(
             )
             messageDao.insertMessage(agentMessage)
 
+            // Track thought and tool-status message IDs across stream events
+            var currentThoughtId: String? = null
+            var currentToolId: String? = null
+
             // Send via ACP and collect streaming response
             val messageFlow = acpClient.sendMessage(session, contentBlocks)
-                .map { acpMessage ->
+                .transform { acpMessage ->
                     when (acpMessage) {
                         is ACPMessage.TextChunk -> {
-                            // Append text to agent message
                             val current = messageDao.getMessageById(agentMessageId)
                             if (current != null) {
                                 val updated = current.copy(
@@ -83,9 +87,60 @@ class MessageRepository @Inject constructor(
                                     status = if (acpMessage.isComplete) MessageStatus.DELIVERED else MessageStatus.SENDING
                                 )
                                 messageDao.updateMessage(updated)
-                                updated
+                                emit(updated)
+                            }
+                        }
+                        is ACPMessage.Thought -> {
+                            if (currentThoughtId != null) {
+                                messageDao.getMessageById(currentThoughtId!!)?.let { t ->
+                                    val updated = t.copy(text = acpMessage.text)
+                                    messageDao.updateMessage(updated)
+                                    emit(updated)
+                                }
                             } else {
-                                agentMessage
+                                val thoughtMsg = Message(
+                                    agentId = agentId,
+                                    text = acpMessage.text,
+                                    sender = MessageSender.AGENT,
+                                    status = MessageStatus.SENDING,
+                                    type = MessageType.THOUGHT
+                                )
+                                messageDao.insertMessage(thoughtMsg)
+                                currentThoughtId = thoughtMsg.id
+                                emit(thoughtMsg)
+                            }
+                        }
+                        is ACPMessage.ToolStatus -> {
+                            val toolMsg = Message(
+                                agentId = agentId,
+                                text = acpMessage.text,
+                                sender = MessageSender.AGENT,
+                                status = MessageStatus.SENT,
+                                type = MessageType.TOOL_STATUS
+                            )
+                            messageDao.insertMessage(toolMsg)
+                            currentToolId = toolMsg.id
+                            emit(toolMsg)
+                        }
+                        is ACPMessage.ToolStatusUpdate -> {
+                            if (currentToolId != null) {
+                                messageDao.getMessageById(currentToolId!!)?.let { t ->
+                                    val updated = t.copy(text = t.text + "\n" + acpMessage.text)
+                                    messageDao.updateMessage(updated)
+                                    emit(updated)
+                                }
+                            } else {
+                                // No current tool context — create a new one
+                                val toolMsg = Message(
+                                    agentId = agentId,
+                                    text = acpMessage.text,
+                                    sender = MessageSender.AGENT,
+                                    status = MessageStatus.SENT,
+                                    type = MessageType.TOOL_STATUS
+                                )
+                                messageDao.insertMessage(toolMsg)
+                                currentToolId = toolMsg.id
+                                emit(toolMsg)
                             }
                         }
                         is ACPMessage.Complete -> {
@@ -93,10 +148,17 @@ class MessageRepository @Inject constructor(
                             if (current != null) {
                                 val updated = current.copy(status = MessageStatus.DELIVERED)
                                 messageDao.updateMessage(updated)
-                                updated
-                            } else {
-                                agentMessage
+                                emit(updated)
                             }
+                            // Stop thought spinner
+                            currentThoughtId?.let { tId ->
+                                messageDao.getMessageById(tId)?.let { t ->
+                                    val updated = t.copy(status = MessageStatus.SENT)
+                                    messageDao.updateMessage(updated)
+                                    emit(updated)
+                                }
+                            }
+                            currentToolId = null
                         }
                         is ACPMessage.Error -> {
                             val current = messageDao.getMessageById(agentMessageId)
@@ -106,9 +168,7 @@ class MessageRepository @Inject constructor(
                                     error = acpMessage.message
                                 )
                                 messageDao.updateMessage(updated)
-                                updated
-                            } else {
-                                agentMessage
+                                emit(updated)
                             }
                         }
                     }

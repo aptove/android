@@ -14,6 +14,8 @@ import com.acp.chat.data.model.MessageSender
 import com.acp.chat.data.model.MessageStatus
 import com.acp.chat.data.model.MessageType
 import com.acp.chat.data.model.PermissionOptionInfo
+import com.acp.chat.data.model.Message.Companion.serializeOptions
+import com.acp.chat.data.model.Message.Companion.deserializeOptions
 import com.acp.chat.data.repository.MessageRepository
 import com.acp.chat.domain.AgentManager
 import com.acp.chat.domain.usecase.SendMessageUseCase
@@ -82,7 +84,17 @@ class ChatViewModel @Inject constructor(
                     _uiState.update { it.copy(error = e.message) }
                 }
                 .collect { messages ->
-                    _uiState.update { it.copy(messages = messages) }
+                    // Rebuild pendingApprovalOptions from unresolved approval messages persisted in DB
+                    val pendingOptions = messages
+                        .filter { it.type == MessageType.TOOL_APPROVAL_REQUEST && it.toolApproved == null }
+                        .mapNotNull { msg ->
+                            val options = msg.toolOptions?.let { deserializeOptions(it) }
+                                ?.takeIf { it.isNotEmpty() }
+                                ?: return@mapNotNull null
+                            msg.id to options
+                        }
+                        .toMap()
+                    _uiState.update { it.copy(messages = messages, pendingApprovalOptions = pendingOptions) }
                 }
         }
     }
@@ -111,11 +123,12 @@ class ChatViewModel @Inject constructor(
                         toolCallId = toolCallId,
                         toolTitle = title,
                         toolCommand = command,
-                        toolApproved = null
+                        toolApproved = null,
+                        toolOptions = serializeOptions(permissionOptions)
                     )
                     messageRepository.insertMessage(approvalMessage)
 
-                    // Store options in memory mapped to message ID
+                    // Store options in memory mapped to message ID (also persisted above for restarts)
                     _uiState.update { state ->
                         val newOptionsMap = state.pendingApprovalOptions.toMutableMap()
                         newOptionsMap[approvalMessage.id] = permissionOptions
@@ -340,6 +353,7 @@ class ChatViewModel @Inject constructor(
                             is com.acp.chat.domain.acp.ACPMessage.TextChunk -> accumulated += msg.text
                             is com.acp.chat.domain.acp.ACPMessage.Complete -> { /* done */ }
                             is com.acp.chat.domain.acp.ACPMessage.Error -> throw Exception(msg.message)
+                            else -> { /* ignore thought/tool events during voice correction */ }
                         }
                     }
                 val corrected = parseCorrectedText(accumulated) ?: rawTranscript

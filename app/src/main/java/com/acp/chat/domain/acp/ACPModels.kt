@@ -13,6 +13,11 @@ sealed class ACPConnectionState {
 
 sealed class ACPMessage {
     data class TextChunk(val text: String, val isComplete: Boolean = false) : ACPMessage()
+    data class Thought(val text: String) : ACPMessage()
+    /** A new tool call started. Creates a new tool-status message bubble. */
+    data class ToolStatus(val text: String) : ACPMessage()
+    /** An update to the in-progress tool call. Appends to the current tool-status bubble. */
+    data class ToolStatusUpdate(val text: String) : ACPMessage()
     data class Error(val message: String) : ACPMessage()
     data object Complete : ACPMessage()
 }

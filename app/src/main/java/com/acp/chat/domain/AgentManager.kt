@@ -9,6 +9,7 @@ import com.acp.chat.data.model.ConnectionConfig
 import com.acp.chat.data.model.ConnectionStatus
 import com.acp.chat.data.model.TransportEndpoint
 import com.acp.chat.data.repository.AgentRepository
+import com.acp.chat.data.repository.MessageRepository
 import com.acp.chat.domain.acp.ACPClient
 import com.acp.chat.domain.acp.ACPConnectionState
 import com.acp.chat.service.PushTokenManager
@@ -49,6 +50,7 @@ data class ConnectionResult(
 class AgentManager @Inject constructor(
     @ApplicationContext private val context: Context,
     private val repository: AgentRepository,
+    private val messageRepository: MessageRepository,
     private val credentialStorage: CredentialStorage,
     private val acpClient: ACPClient
 ) {
@@ -349,6 +351,7 @@ class AgentManager @Inject constructor(
         }
         repository.clearSessionInfo(agentId)
         repository.updateConnectionStatus(agentId, ConnectionStatus.DISCONNECTED)
+        messageRepository.deleteAllMessagesForAgent(agentId)
         Log.d(TAG, "✅ Credentials updated for agent $agentId")
     }
 
@@ -359,6 +362,7 @@ class AgentManager @Inject constructor(
         Log.d(TAG, "Clearing session for agent: $agentId")
         repository.clearSessionInfo(agentId)
         sessionCache.remove(agentId)
+        messageRepository.deleteAllMessagesForAgent(agentId)
     }
 
     fun getSession(agentId: String): ClientSession? = sessionCache[agentId]

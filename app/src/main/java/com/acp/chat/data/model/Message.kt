@@ -2,6 +2,8 @@ package com.acp.chat.data.model
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import org.json.JSONArray
+import org.json.JSONObject
 import java.util.UUID
 
 enum class MessageSender {
@@ -19,7 +21,9 @@ enum class MessageStatus {
 
 enum class MessageType {
     TEXT,
-    TOOL_APPROVAL_REQUEST
+    TOOL_APPROVAL_REQUEST,
+    THOUGHT,
+    TOOL_STATUS
 }
 
 data class PermissionOptionInfo(
@@ -50,10 +54,44 @@ data class Message(
     val toolCallId: String? = null,
     val toolTitle: String? = null,
     val toolCommand: String? = null,
-    val toolApproved: Boolean? = null
+    val toolApproved: Boolean? = null,
+    /** JSON-encoded list of [PermissionOptionInfo]. Persists approval options across restarts. */
+    val toolOptions: String? = null
 ) {
     val toolApproval: ToolApprovalInfo?
-        get() = if (type == MessageType.TOOL_APPROVAL_REQUEST && toolCallId != null && toolTitle != null) {
-            ToolApprovalInfo(toolCallId, toolTitle, toolCommand, toolApproved)
-        } else null
+        get() {
+            if (type != MessageType.TOOL_APPROVAL_REQUEST || toolCallId == null || toolTitle == null) return null
+            val options = toolOptions?.let { deserializeOptions(it) } ?: emptyList()
+            return ToolApprovalInfo(toolCallId, toolTitle, toolCommand, toolApproved, options)
+        }
+
+    companion object {
+        fun serializeOptions(options: List<PermissionOptionInfo>): String {
+            return JSONArray().apply {
+                options.forEach { opt ->
+                    put(JSONObject().apply {
+                        put("optionId", opt.optionId)
+                        put("name", opt.name)
+                        put("kind", opt.kind)
+                    })
+                }
+            }.toString()
+        }
+
+        fun deserializeOptions(json: String): List<PermissionOptionInfo> {
+            return try {
+                val arr = JSONArray(json)
+                (0 until arr.length()).map { i ->
+                    val obj = arr.getJSONObject(i)
+                    PermissionOptionInfo(
+                        optionId = obj.getString("optionId"),
+                        name = obj.getString("name"),
+                        kind = obj.getString("kind")
+                    )
+                }
+            } catch (e: Exception) {
+                emptyList()
+            }
+        }
+    }
 }
