@@ -74,13 +74,35 @@ class MessageRepository @Inject constructor(
             // Track thought and tool-status message IDs across stream events
             var currentThoughtId: String? = null
             var currentToolId: String? = null
+            // Tracks the current agent text bubble; advances when an intervening message is inserted
+            var currentAgentMessageId = agentMessageId
+            var needsNewBubble = false
 
             // Send via ACP and collect streaming response
             val messageFlow = acpClient.sendMessage(session, contentBlocks)
                 .transform { acpMessage ->
                     when (acpMessage) {
                         is ACPMessage.TextChunk -> {
-                            val current = messageDao.getMessageById(agentMessageId)
+                            // If a tool/approval message was inserted since the last chunk,
+                            // seal the current bubble and start a new one.
+                            if (needsNewBubble) {
+                                val prev = messageDao.getMessageById(currentAgentMessageId)
+                                if (prev != null && prev.text.isNotEmpty()) {
+                                    val sealed = prev.copy(status = MessageStatus.SENT)
+                                    messageDao.updateMessage(sealed)
+                                    emit(sealed)
+                                    val newAgentMsg = Message(
+                                        agentId = agentId,
+                                        text = "",
+                                        sender = MessageSender.AGENT,
+                                        status = MessageStatus.SENDING
+                                    )
+                                    messageDao.insertMessage(newAgentMsg)
+                                    currentAgentMessageId = newAgentMsg.id
+                                }
+                                needsNewBubble = false
+                            }
+                            val current = messageDao.getMessageById(currentAgentMessageId)
                             if (current != null) {
                                 val updated = current.copy(
                                     text = current.text + acpMessage.text,
@@ -120,6 +142,7 @@ class MessageRepository @Inject constructor(
                             )
                             messageDao.insertMessage(toolMsg)
                             currentToolId = toolMsg.id
+                            needsNewBubble = true
                             emit(toolMsg)
                         }
                         is ACPMessage.ToolStatusUpdate -> {
@@ -144,7 +167,7 @@ class MessageRepository @Inject constructor(
                             }
                         }
                         is ACPMessage.Complete -> {
-                            val current = messageDao.getMessageById(agentMessageId)
+                            val current = messageDao.getMessageById(currentAgentMessageId)
                             if (current != null) {
                                 val updated = current.copy(status = MessageStatus.DELIVERED)
                                 messageDao.updateMessage(updated)
@@ -161,7 +184,7 @@ class MessageRepository @Inject constructor(
                             currentToolId = null
                         }
                         is ACPMessage.Error -> {
-                            val current = messageDao.getMessageById(agentMessageId)
+                            val current = messageDao.getMessageById(currentAgentMessageId)
                             if (current != null) {
                                 val updated = current.copy(
                                     status = MessageStatus.ERROR,
@@ -174,7 +197,7 @@ class MessageRepository @Inject constructor(
                     }
                 }
                 .catch { e ->
-                    messageDao.updateMessageStatus(agentMessageId, MessageStatus.ERROR)
+                    messageDao.updateMessageStatus(currentAgentMessageId, MessageStatus.ERROR)
                 }
 
             Result.success(messageFlow)
