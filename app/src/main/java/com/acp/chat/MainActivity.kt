@@ -4,7 +4,6 @@ import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -46,15 +45,9 @@ class MainActivity : ComponentActivity() {
         val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
 
         setContent {
-            var themeMode by remember { mutableStateOf(prefs.getString("theme_mode", "dark") ?: "dark") }
+            var isDarkMode by remember { mutableStateOf(prefs.getBoolean("is_dark_mode", true)) }
 
-            val isDark = when (themeMode) {
-                "light" -> false
-                "system" -> isSystemInDarkTheme()
-                else -> true // "dark" is default
-            }
-
-            ACPChatTheme(darkTheme = isDark) {
+            ACPChatTheme(darkTheme = isDarkMode) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
@@ -117,10 +110,10 @@ class MainActivity : ComponentActivity() {
                         composable(Screen.Settings.route) {
                             SettingsScreen(
                                 onNavigateBack = { navController.popBackStack() },
-                                themeMode = themeMode,
-                                onThemeChange = { mode ->
-                                    themeMode = mode
-                                    prefs.edit().putString("theme_mode", mode).apply()
+                                isDarkMode = isDarkMode,
+                                onDarkModeChange = { dark ->
+                                    isDarkMode = dark
+                                    prefs.edit().putBoolean("is_dark_mode", dark).apply()
                                 }
                             )
                         }

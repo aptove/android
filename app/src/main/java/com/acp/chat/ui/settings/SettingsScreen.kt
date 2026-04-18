@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -20,8 +21,8 @@ import com.acp.chat.BuildConfig
 @Composable
 fun SettingsScreen(
     onNavigateBack: () -> Unit,
-    themeMode: String,
-    onThemeChange: (String) -> Unit
+    isDarkMode: Boolean,
+    onDarkModeChange: (Boolean) -> Unit
 ) {
     val context = LocalContext.current
 
@@ -50,11 +51,22 @@ fun SettingsScreen(
                     modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 4.dp)
                 )
                 HorizontalDivider()
-                ThemeOption("Dark", "dark", themeMode, onThemeChange)
-                HorizontalDivider()
-                ThemeOption("Light", "light", themeMode, onThemeChange)
-                HorizontalDivider()
-                ThemeOption("System", "system", themeMode, onThemeChange)
+                ListItem(
+                    headlineContent = { Text("Dark Mode") },
+                    supportingContent = {
+                        Text(if (isDarkMode) "Dark theme active" else "Light theme active")
+                    },
+                    leadingContent = {
+                        Icon(Icons.Default.DarkMode, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    },
+                    trailingContent = {
+                        Switch(
+                            checked = isDarkMode,
+                            onCheckedChange = onDarkModeChange
+                        )
+                    },
+                    modifier = Modifier.clickable { onDarkModeChange(!isDarkMode) }
+                )
                 HorizontalDivider()
             }
 
@@ -101,18 +113,4 @@ fun SettingsScreen(
             }
         }
     }
-}
-
-@Composable
-private fun ThemeOption(label: String, value: String, current: String, onSelect: (String) -> Unit) {
-    ListItem(
-        headlineContent = { Text(label) },
-        trailingContent = {
-            RadioButton(
-                selected = current == value,
-                onClick = { onSelect(value) }
-            )
-        },
-        modifier = Modifier.clickable { onSelect(value) }
-    )
 }
