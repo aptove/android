@@ -33,6 +33,7 @@ fun AgentListScreen(
     onNavigateToChat: (String) -> Unit,
     onNavigateToQRScanner: () -> Unit,
     onNavigateToAgentConfig: (String) -> Unit,
+    onNavigateToSettings: () -> Unit,
     viewModel: AgentListViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -47,6 +48,16 @@ fun AgentListScreen(
         floatingActionButton = {
             FloatingActionButton(onClick = onNavigateToQRScanner) {
                 Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add_agent))
+            }
+        },
+        bottomBar = {
+            NavigationBar {
+                NavigationBarItem(
+                    selected = false,
+                    onClick = onNavigateToSettings,
+                    icon = { Icon(Icons.Default.Settings, contentDescription = "Settings") },
+                    label = { Text("Settings") }
+                )
             }
         }
     ) { padding ->

@@ -16,6 +16,7 @@ import com.acp.chat.ui.agents.AgentConfigurationScreen
 import com.acp.chat.ui.agents.AgentListScreen
 import com.acp.chat.ui.chat.ChatScreen
 import com.acp.chat.ui.qr.QRScannerScreen
+import com.acp.chat.ui.settings.SettingsScreen
 import com.acp.chat.ui.theme.ACPChatTheme
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -28,6 +29,7 @@ sealed class Screen(val route: String) {
     data object AgentConfiguration : Screen("agent_config/{agentId}") {
         fun createRoute(agentId: String) = "agent_config/$agentId"
     }
+    data object Settings : Screen("settings")
 }
 
 @AndroidEntryPoint
@@ -57,6 +59,9 @@ class MainActivity : ComponentActivity() {
                                 },
                                 onNavigateToAgentConfig = { agentId ->
                                     navController.navigate(Screen.AgentConfiguration.createRoute(agentId))
+                                },
+                                onNavigateToSettings = {
+                                    navController.navigate(Screen.Settings.route)
                                 }
                             )
                         }
@@ -89,6 +94,12 @@ class MainActivity : ComponentActivity() {
                             )
                         ) {
                             AgentConfigurationScreen(
+                                onNavigateBack = { navController.popBackStack() }
+                            )
+                        }
+
+                        composable(Screen.Settings.route) {
+                            SettingsScreen(
                                 onNavigateBack = { navController.popBackStack() }
                             )
                         }
