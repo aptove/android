@@ -14,8 +14,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.acp.chat.BuildConfig
+import com.acp.chat.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -29,7 +31,7 @@ fun SettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Settings") },
+                title = { Text(stringResource(R.string.settings_title)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -45,16 +47,16 @@ fun SettingsScreen(
         ) {
             item {
                 Text(
-                    text = "Appearance",
+                    text = stringResource(R.string.settings_appearance),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 4.dp)
                 )
                 HorizontalDivider()
                 ListItem(
-                    headlineContent = { Text("Dark Mode") },
+                    headlineContent = { Text(stringResource(R.string.settings_dark_mode)) },
                     supportingContent = {
-                        Text(if (isDarkMode) "Dark theme active" else "Light theme active")
+                        Text(if (isDarkMode) stringResource(R.string.settings_dark_theme_active) else stringResource(R.string.settings_light_theme_active))
                     },
                     leadingContent = {
                         Icon(Icons.Default.DarkMode, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
@@ -72,7 +74,7 @@ fun SettingsScreen(
 
             item {
                 Text(
-                    text = "About",
+                    text = stringResource(R.string.settings_about),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 4.dp)
@@ -82,7 +84,7 @@ fun SettingsScreen(
 
             item {
                 ListItem(
-                    headlineContent = { Text("Terms of Service") },
+                    headlineContent = { Text(stringResource(R.string.settings_terms_of_service)) },
                     trailingContent = {
                         Icon(
                             Icons.AutoMirrored.Filled.OpenInNew,
@@ -100,7 +102,7 @@ fun SettingsScreen(
 
             item {
                 ListItem(
-                    headlineContent = { Text("Version") },
+                    headlineContent = { Text(stringResource(R.string.settings_version)) },
                     trailingContent = {
                         Text(
                             BuildConfig.VERSION_NAME,

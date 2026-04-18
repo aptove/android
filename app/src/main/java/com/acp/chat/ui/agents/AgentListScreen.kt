@@ -55,8 +55,8 @@ fun AgentListScreen(
                 NavigationBarItem(
                     selected = false,
                     onClick = onNavigateToSettings,
-                    icon = { Icon(Icons.Default.Settings, contentDescription = "Settings") },
-                    label = { Text("Settings") }
+                    icon = { Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.nav_settings)) },
+                    label = { Text(stringResource(R.string.nav_settings)) }
                 )
             }
         }
@@ -95,8 +95,8 @@ fun AgentListScreen(
     agentToDelete?.let { agent ->
         AlertDialog(
             onDismissRequest = { agentToDelete = null },
-            title = { Text("Delete Agent?") },
-            text = { Text("Are you sure you want to delete \"${agent.name}\"? This will remove all conversation history.") },
+            title = { Text(stringResource(R.string.delete_agent_title)) },
+            text = { Text(stringResource(R.string.delete_agent_message, agent.name)) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -107,12 +107,12 @@ fun AgentListScreen(
                         contentColor = MaterialTheme.colorScheme.error
                     )
                 ) {
-                    Text("Delete")
+                    Text(stringResource(R.string.delete))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { agentToDelete = null }) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.cancel))
                 }
             }
         )
@@ -122,11 +122,11 @@ fun AgentListScreen(
     uiState.error?.let { error ->
         AlertDialog(
             onDismissRequest = { viewModel.clearError() },
-            title = { Text("Error") },
+            title = { Text(stringResource(R.string.error)) },
             text = { Text(error) },
             confirmButton = {
                 TextButton(onClick = { viewModel.clearError() }) {
-                    Text("OK")
+                    Text(stringResource(R.string.ok))
                 }
             }
         )

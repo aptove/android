@@ -186,11 +186,11 @@ fun ChatScreen(
     uiState.error?.let { error ->
         AlertDialog(
             onDismissRequest = { viewModel.clearError() },
-            title = { Text("Error") },
+            title = { Text(stringResource(R.string.error)) },
             text = { Text(error) },
             confirmButton = {
                 TextButton(onClick = { viewModel.clearError() }) {
-                    Text("OK")
+                    Text(stringResource(R.string.ok))
                 }
             }
         )
@@ -300,7 +300,7 @@ private fun MessageBubble(
                                             contentColor = MaterialTheme.colorScheme.outline
                                         )
                                     ) {
-                                        Text("Cancel")
+                                        Text(stringResource(R.string.cancel))
                                     }
                                 }
                             } else {
@@ -318,11 +318,11 @@ private fun MessageBubble(
                                     ) {
                                         Icon(
                                             Icons.Default.Check,
-                                            contentDescription = "Approve",
+                                            contentDescription = stringResource(R.string.chat_approve),
                                             modifier = Modifier.size(18.dp)
                                         )
                                         Spacer(modifier = Modifier.width(4.dp))
-                                        Text("Approve")
+                                        Text(stringResource(R.string.chat_approve))
                                     }
 
                                     OutlinedButton(
@@ -334,11 +334,11 @@ private fun MessageBubble(
                                     ) {
                                         Icon(
                                             Icons.Default.Close,
-                                            contentDescription = "Reject",
+                                            contentDescription = stringResource(R.string.chat_reject),
                                             modifier = Modifier.size(18.dp)
                                         )
                                         Spacer(modifier = Modifier.width(4.dp))
-                                        Text("Reject")
+                                        Text(stringResource(R.string.chat_reject))
                                     }
                                 }
                             }

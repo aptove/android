@@ -130,7 +130,7 @@ fun QRScannerScreen(
                                 modifier = Modifier.size(18.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Scan QR Code")
+                            Text(stringResource(R.string.qr_scanner_title))
                         }
                         
                         Spacer(modifier = Modifier.height(8.dp))
@@ -146,7 +146,7 @@ fun QRScannerScreen(
                                 modifier = Modifier.size(18.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Enter Pairing Code")
+                            Text(stringResource(R.string.qr_enter_pairing_code))
                         }
                     }
                 }
@@ -157,7 +157,7 @@ fun QRScannerScreen(
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         CircularProgressIndicator()
-                        Text("Connecting to agent...")
+                        Text(stringResource(R.string.qr_connecting))
                     }
                 }
                 
@@ -182,7 +182,7 @@ fun QRScannerScreen(
                             color = MaterialTheme.colorScheme.error
                         )
                         Button(onClick = { viewModel.resetToScanning() }) {
-                            Text("Try Again")
+                            Text(stringResource(R.string.qr_try_again))
                         }
                     }
                 }
@@ -224,7 +224,7 @@ private fun PairingCodeDialog(
     
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Enter Pairing Code") },
+        title = { Text(stringResource(R.string.qr_enter_pairing_code)) },
         text = {
             Column(
                 modifier = Modifier
@@ -233,7 +233,7 @@ private fun PairingCodeDialog(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
-                    text = "Enter the pairing details from the bridge terminal",
+                    text = stringResource(R.string.qr_pairing_dialog_desc),
                     style = MaterialTheme.typography.bodyMedium
                 )
                 
@@ -244,14 +244,14 @@ private fun PairingCodeDialog(
                 ) {
                     OutlinedTextField(
                         value = when (selectedPairingType) {
-                            PairingType.LOCAL -> "Local Network"
-                            PairingType.CLOUDFLARE -> "Cloudflare"
-                            PairingType.TAILSCALE -> "Tailscale"
+                            PairingType.LOCAL -> stringResource(R.string.transport_local_network)
+                            PairingType.CLOUDFLARE -> stringResource(R.string.transport_cloudflare)
+                            PairingType.TAILSCALE -> stringResource(R.string.transport_tailscale)
                             PairingType.UNKNOWN -> "Unknown"
                         },
                         onValueChange = {},
                         readOnly = true,
-                        label = { Text("Connection Type") },
+                        label = { Text(stringResource(R.string.qr_connection_type)) },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = pairingTypeExpanded) },
                         modifier = Modifier
                             .fillMaxWidth()
@@ -263,21 +263,21 @@ private fun PairingCodeDialog(
                         onDismissRequest = { pairingTypeExpanded = false }
                     ) {
                         DropdownMenuItem(
-                            text = { Text("Local Network") },
+                            text = { Text(stringResource(R.string.transport_local_network)) },
                             onClick = {
                                 selectedPairingType = PairingType.LOCAL
                                 pairingTypeExpanded = false
                             }
                         )
                         DropdownMenuItem(
-                            text = { Text("Cloudflare") },
+                            text = { Text(stringResource(R.string.transport_cloudflare)) },
                             onClick = {
                                 selectedPairingType = PairingType.CLOUDFLARE
                                 pairingTypeExpanded = false
                             }
                         )
                         DropdownMenuItem(
-                            text = { Text("Tailscale") },
+                            text = { Text(stringResource(R.string.transport_tailscale)) },
                             onClick = {
                                 selectedPairingType = PairingType.TAILSCALE
                                 pairingTypeExpanded = false
@@ -294,16 +294,16 @@ private fun PairingCodeDialog(
                     OutlinedTextField(
                         value = address,
                         onValueChange = { address = it },
-                        label = { Text("Bridge Address") },
+                        label = { Text(stringResource(R.string.qr_bridge_address)) },
                         placeholder = { Text("10.0.2.2") },
                         modifier = Modifier.weight(2f),
                         singleLine = true
                     )
-                    
+
                     OutlinedTextField(
                         value = port,
                         onValueChange = { port = it },
-                        label = { Text("Port") },
+                        label = { Text(stringResource(R.string.qr_port)) },
                         placeholder = { Text("8443") },
                         modifier = Modifier.weight(1f),
                         singleLine = true
@@ -319,12 +319,12 @@ private fun PairingCodeDialog(
                             code = it 
                         }
                     },
-                    label = { Text("Pairing Code") },
+                    label = { Text(stringResource(R.string.qr_pairing_code_label)) },
                     placeholder = { Text("123456") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     supportingText = {
-                        Text("6-digit code shown in the bridge terminal")
+                        Text(stringResource(R.string.qr_pairing_code_hint))
                     }
                 )
                 
@@ -332,13 +332,13 @@ private fun PairingCodeDialog(
                 OutlinedTextField(
                     value = fingerprint,
                     onValueChange = { fingerprint = it },
-                    label = { Text("Certificate Fingerprint (optional)") },
+                    label = { Text(stringResource(R.string.qr_certificate_fingerprint)) },
                     placeholder = { Text("SHA256:XX:XX:XX:...") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = false,
                     minLines = 2,
                     supportingText = {
-                        Text("Optional: Validates the bridge's TLS certificate")
+                        Text(stringResource(R.string.qr_fingerprint_hint))
                     }
                 )
             }
@@ -350,12 +350,12 @@ private fun PairingCodeDialog(
                 },
                 enabled = isValid
             ) {
-                Text("Connect")
+                Text(stringResource(R.string.connect))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(stringResource(R.string.cancel))
             }
         }
     )

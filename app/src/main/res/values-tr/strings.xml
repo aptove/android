@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ACP Chat</string>
+
+    <!-- Agent List Screen -->
+    <string name="agents_title">Ajanlar</string>
+    <string name="add_agent">Ajan Ekle</string>
+    <string name="no_agents">Bağlı ajan yok</string>
+    <string name="scan_qr_to_add">İlk ajanınızı eklemek için QR kodu tarayın</string>
+    <string name="agent_connected">Bağlı</string>
+    <string name="agent_disconnected">Bağlı Değil</string>
+    <string name="agent_reconnecting">Yeniden Bağlanıyor…</string>
+
+    <!-- Navigation -->
+    <string name="nav_settings">Ayarlar</string>
+    <string name="nav_chat">Sohbet</string>
+
+    <!-- QR Scanner Screen -->
+    <string name="qr_scanner_title">QR Kodu Tara</string>
+    <string name="qr_scanner_instructions">Kamerayı ajan QR koduna tutun</string>
+    <string name="qr_scanner_flashlight">Flaşı Aç/Kapat</string>
+    <string name="qr_scanner_cancel">İptal</string>
+    <string name="qr_scanner_manual_entry">Manuel Giriş</string>
+    <string name="qr_enter_pairing_code">Eşleştirme Kodu Girin</string>
+    <string name="qr_connecting">Ajana bağlanılıyor…</string>
+    <string name="qr_try_again">Tekrar Dene</string>
+    <string name="qr_pairing_dialog_desc">Köprü terminalinden eşleştirme bilgilerini girin</string>
+    <string name="qr_connection_type">Bağlantı Türü</string>
+    <string name="qr_bridge_address">Köprü Adresi</string>
+    <string name="qr_port">Port</string>
+    <string name="qr_pairing_code_label">Eşleştirme Kodu</string>
+    <string name="qr_pairing_code_hint">Köprü terminalinde gösterilen 6 basamaklı kod</string>
+    <string name="qr_certificate_fingerprint">Sertifika Parmak İzi (isteğe bağlı)</string>
+    <string name="qr_fingerprint_hint">İsteğe bağlı: Köprünün TLS sertifikasını doğrular</string>
+    <string name="connect">Bağlan</string>
+
+    <!-- Transport types -->
+    <string name="transport_local_network">Yerel Ağ</string>
+    <string name="transport_cloudflare">Cloudflare</string>
+    <string name="transport_tailscale">Tailscale</string>
+    <string name="transport_via">%1$s üzerinden</string>
+
+    <!-- Chat Screen -->
+    <string name="chat_title">Sohbet</string>
+    <string name="message_hint">Mesaj yazın…</string>
+    <string name="send_message">Gönder</string>
+    <string name="message_sending">Gönderiliyor…</string>
+    <string name="message_sent">Gönderildi</string>
+    <string name="message_error">Gönderilemedi</string>
+    <string name="session_resumed">Oturum devam ediyor</string>
+    <string name="session_new">Yeni oturum</string>
+    <string name="chat_approve">Onayla</string>
+    <string name="chat_reject">Reddet</string>
+
+    <!-- Agent Configuration Screen -->
+    <string name="agent_configuration_title">Ajan Yapılandırması</string>
+    <string name="back">Geri</string>
+    <string name="agent_not_found">Ajan bulunamadı</string>
+    <string name="agent_info_title">Ajan Bilgileri</string>
+    <string name="name_label">Ad</string>
+    <string name="url_label">URL</string>
+    <string name="status_label">Durum</string>
+    <string name="protocol_version_label">Protokol</string>
+    <string name="last_connected_label">Son Bağlantı</string>
+    <string name="session_info_title">Oturum Bilgileri</string>
+    <string name="session_id_label">Oturum Kimliği</string>
+    <string name="session_started_label">Başlangıç</string>
+    <string name="message_count_label">Mesajlar</string>
+    <string name="supports_resume_label">Yeniden Başlatmayı Destekler</string>
+    <string name="yes">Evet</string>
+    <string name="no">Hayır</string>
+    <string name="no_active_session">Etkin oturum yok</string>
+    <string name="actions_title">İşlemler</string>
+    <string name="clear_session_button">Oturumu Temizle</string>
+    <string name="clear_session_description">Yeni bir konuşma başlat. Tüm mesajlar silinecek.</string>
+    <string name="clear_session_title">Oturum Temizlensin mi?</string>
+    <string name="clear_session_message">Bu işlem tüm sohbet geçmişini silecek ve yeni bir oturum başlatacak. Bu işlem geri alınamaz.</string>
+    <string name="clear">Temizle</string>
+    <string name="delete_agent_button">Ajanı Sil</string>
+    <string name="delete_agent_description">Bu ajanı ve tüm ilişkili verileri kalıcı olarak kaldırın.</string>
+    <string name="delete_agent_title">Ajan Silinsin mi?</string>
+    <string name="delete_agent_message">\"%1$s\" ajanını silmek istediğinizden emin misiniz? Tüm sohbet geçmişi kaldırılacak.</string>
+    <string name="delete">Sil</string>
+    <string name="configure_agent">Ajanı Yapılandır</string>
+    <string name="transports_title">Taşıyıcılar</string>
+    <string name="transport_preferred">Tercih edilen taşıyıcı</string>
+    <string name="transport_delete">Taşıyıcıyı sil</string>
+
+    <!-- Settings Screen -->
+    <string name="settings_title">Ayarlar</string>
+    <string name="settings_appearance">Görünüm</string>
+    <string name="settings_dark_mode">Karanlık Mod</string>
+    <string name="settings_dark_theme_active">Karanlık tema etkin</string>
+    <string name="settings_light_theme_active">Açık tema etkin</string>
+    <string name="settings_about">Hakkında</string>
+    <string name="settings_terms_of_service">Kullanım Koşulları</string>
+    <string name="settings_version">Sürüm</string>
+
+    <!-- Common -->
+    <string name="cancel">İptal</string>
+    <string name="ok">Tamam</string>
+    <string name="error">Hata</string>
+
+    <!-- Errors -->
+    <string name="error_camera_permission">QR kod taramak için kamera izni gerekli</string>
+    <string name="error_invalid_qr">Geçersiz QR kod formatı</string>
+    <string name="error_connection_failed">Ajana bağlanılamadı</string>
+    <string name="error_no_internet">İnternet bağlantısı yok</string>
+    <string name="error_agent_not_responding">Ajan yanıt vermiyor</string>
+    <string name="error_timeout">Bağlantı zaman aşımı</string>
+    <string name="error_generic">Bir hata oluştu. Lütfen tekrar deneyin.</string>
+
+    <!-- Notifications -->
+    <string name="notification_channel_name">Ajan Bağlantıları</string>
+    <string name="notification_channel_description">Aktif ajan bağlantıları için bildirimler</string>
+    <string name="notification_active_connections">%1$d aktif ajan bağlantısı</string>
+</resources>
