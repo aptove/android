@@ -34,7 +34,7 @@ private val DarkColorScheme = darkColorScheme(
 
 @Composable
 fun ACPChatTheme(
-    darkTheme: Boolean = false,
+    darkTheme: Boolean = true,
     content: @Composable () -> Unit
 ) {
     val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme

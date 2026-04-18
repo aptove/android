@@ -1,11 +1,17 @@
 package com.acp.chat
 
+import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -36,9 +42,19 @@ sealed class Screen(val route: String) {
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
+
+        val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
+
         setContent {
-            ACPChatTheme {
+            var themeMode by remember { mutableStateOf(prefs.getString("theme_mode", "dark") ?: "dark") }
+
+            val isDark = when (themeMode) {
+                "light" -> false
+                "system" -> isSystemInDarkTheme()
+                else -> true // "dark" is default
+            }
+
+            ACPChatTheme(darkTheme = isDark) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
@@ -100,7 +116,12 @@ class MainActivity : ComponentActivity() {
 
                         composable(Screen.Settings.route) {
                             SettingsScreen(
-                                onNavigateBack = { navController.popBackStack() }
+                                onNavigateBack = { navController.popBackStack() },
+                                themeMode = themeMode,
+                                onThemeChange = { mode ->
+                                    themeMode = mode
+                                    prefs.edit().putString("theme_mode", mode).apply()
+                                }
                             )
                         }
                     }

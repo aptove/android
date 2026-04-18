@@ -10,6 +10,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -17,7 +18,11 @@ import com.acp.chat.BuildConfig
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(onNavigateBack: () -> Unit) {
+fun SettingsScreen(
+    onNavigateBack: () -> Unit,
+    themeMode: String,
+    onThemeChange: (String) -> Unit
+) {
     val context = LocalContext.current
 
     Scaffold(
@@ -37,6 +42,22 @@ fun SettingsScreen(onNavigateBack: () -> Unit) {
                 .fillMaxSize()
                 .padding(padding)
         ) {
+            item {
+                Text(
+                    text = "Appearance",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 4.dp)
+                )
+                HorizontalDivider()
+                ThemeOption("Dark", "dark", themeMode, onThemeChange)
+                HorizontalDivider()
+                ThemeOption("Light", "light", themeMode, onThemeChange)
+                HorizontalDivider()
+                ThemeOption("System", "system", themeMode, onThemeChange)
+                HorizontalDivider()
+            }
+
             item {
                 Text(
                     text = "About",
@@ -80,4 +101,18 @@ fun SettingsScreen(onNavigateBack: () -> Unit) {
             }
         }
     }
+}
+
+@Composable
+private fun ThemeOption(label: String, value: String, current: String, onSelect: (String) -> Unit) {
+    ListItem(
+        headlineContent = { Text(label) },
+        trailingContent = {
+            RadioButton(
+                selected = current == value,
+                onClick = { onSelect(value) }
+            )
+        },
+        modifier = Modifier.clickable { onSelect(value) }
+    )
 }
