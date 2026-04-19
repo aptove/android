@@ -89,7 +89,7 @@
     <!-- Settings Screen -->
     <string name="settings_title">Ayarlar</string>
     <string name="settings_appearance">Görünüm</string>
-    <string name="settings_dark_mode">Karanlık Mod</string>
+    <string name="settings_dark_mode">Ekran Modu</string>
     <string name="settings_dark_theme_active">Karanlık tema etkin</string>
     <string name="settings_light_theme_active">Açık tema etkin</string>
     <string name="settings_language">Dil</string>
