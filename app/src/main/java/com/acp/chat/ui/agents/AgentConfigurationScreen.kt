@@ -21,7 +21,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.acp.chat.R
 import com.acp.chat.data.model.ConnectionStatus
 import com.acp.chat.data.model.TransportEndpoint
-import java.text.SimpleDateFormat
 import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -473,6 +472,10 @@ private fun InfoRow(
 }
 
 private fun formatTimestamp(timestamp: Long): String {
-    val formatter = SimpleDateFormat("MMM d, yyyy 'at' h:mm a", Locale.getDefault())
+    val formatter = java.text.DateFormat.getDateTimeInstance(
+        java.text.DateFormat.MEDIUM,
+        java.text.DateFormat.SHORT,
+        Locale.getDefault()
+    )
     return formatter.format(Date(timestamp))
 }
