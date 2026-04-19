@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.SharedPreferences
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -58,6 +59,17 @@ fun ChatScreen(
     val coroutineScope = rememberCoroutineScope()
     val voiceState by voiceInputViewModel.recordingState.collectAsState()
     val rawTranscript by voiceInputViewModel.rawTranscript.collectAsState()
+
+    val context = LocalContext.current
+    val prefs = remember { context.getSharedPreferences("settings", Context.MODE_PRIVATE) }
+    val systemLang = java.util.Locale.getDefault().language
+    val defaultVoiceLang = if (systemLang == "tr") "tr-TR" else "en-US"
+    val voiceLanguage = remember { prefs.getString("voice_language", null) ?: defaultVoiceLang }
+
+    LaunchedEffect(voiceLanguage) {
+        voiceInputViewModel.updateLocale(voiceLanguage)
+        viewModel.setVoiceLanguage(voiceLanguage)
+    }
 
     val micPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()

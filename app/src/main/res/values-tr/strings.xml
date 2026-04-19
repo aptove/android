@@ -92,6 +92,10 @@
     <string name="settings_dark_mode">Karanlık Mod</string>
     <string name="settings_dark_theme_active">Karanlık tema etkin</string>
     <string name="settings_light_theme_active">Açık tema etkin</string>
+    <string name="settings_language">Dil</string>
+    <string name="settings_voice_language">Ses Dili</string>
+    <string name="language_english">English</string>
+    <string name="language_turkish">Türkçe</string>
     <string name="settings_about">Hakkında</string>
     <string name="settings_terms_of_service">Kullanım Koşulları</string>
     <string name="settings_version">Sürüm</string>

@@ -1,6 +1,7 @@
 package com.acp.chat
 
 import android.content.Context
+import android.content.res.Configuration
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -24,6 +25,7 @@ import com.acp.chat.ui.qr.QRScannerScreen
 import com.acp.chat.ui.settings.SettingsScreen
 import com.acp.chat.ui.theme.ACPChatTheme
 import dagger.hilt.android.AndroidEntryPoint
+import java.util.Locale
 
 sealed class Screen(val route: String) {
     data object AgentList : Screen("agents")
@@ -39,13 +41,34 @@ sealed class Screen(val route: String) {
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    override fun attachBaseContext(newBase: Context) {
+        val prefs = newBase.getSharedPreferences("settings", Context.MODE_PRIVATE)
+        val systemLang = Locale.getDefault().language
+        val defaultLang = if (systemLang == "tr") "tr" else "en"
+        val lang = prefs.getString("app_language", null) ?: defaultLang
+        val locale = Locale(lang)
+        Locale.setDefault(locale)
+        val config = Configuration(newBase.resources.configuration)
+        config.setLocale(locale)
+        super.attachBaseContext(newBase.createConfigurationContext(config))
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
+        val systemLang = Locale.getDefault().language
+        val defaultLang = if (systemLang == "tr") "tr" else "en"
+        val defaultVoiceLang = if (systemLang == "tr") "tr-TR" else "en-US"
 
         setContent {
             var isDarkMode by remember { mutableStateOf(prefs.getBoolean("is_dark_mode", true)) }
+            var currentLanguage by remember {
+                mutableStateOf(prefs.getString("app_language", null) ?: defaultLang)
+            }
+            var currentVoiceLanguage by remember {
+                mutableStateOf(prefs.getString("voice_language", null) ?: defaultVoiceLang)
+            }
 
             ACPChatTheme(darkTheme = isDarkMode) {
                 Surface(
@@ -114,6 +137,17 @@ class MainActivity : ComponentActivity() {
                                 onDarkModeChange = { dark ->
                                     isDarkMode = dark
                                     prefs.edit().putBoolean("is_dark_mode", dark).apply()
+                                },
+                                currentLanguage = currentLanguage,
+                                onLanguageChange = { lang ->
+                                    currentLanguage = lang
+                                    prefs.edit().putString("app_language", lang).apply()
+                                    recreate()
+                                },
+                                currentVoiceLanguage = currentVoiceLanguage,
+                                onVoiceLanguageChange = { lang ->
+                                    currentVoiceLanguage = lang
+                                    prefs.edit().putString("voice_language", lang).apply()
                                 }
                             )
                         }

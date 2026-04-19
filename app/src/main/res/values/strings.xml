@@ -104,6 +104,10 @@
     <string name="settings_dark_mode">Dark Mode</string>
     <string name="settings_dark_theme_active">Dark theme active</string>
     <string name="settings_light_theme_active">Light theme active</string>
+    <string name="settings_language">Language</string>
+    <string name="settings_voice_language">Voice Language</string>
+    <string name="language_english">English</string>
+    <string name="language_turkish">Türkçe</string>
     <string name="settings_about">About</string>
     <string name="settings_terms_of_service">Terms of Service</string>
     <string name="settings_version">Version</string>

@@ -336,6 +336,12 @@ class ChatViewModel @Inject constructor(
         }
     }
 
+    private var voiceLanguage: String = "en-US"
+
+    fun setVoiceLanguage(lang: String) {
+        voiceLanguage = lang
+    }
+
     fun sendVoiceCorrectionRequest(rawTranscript: String) {
         val session = _uiState.value.session ?: run {
             _uiState.update { it.copy(voiceCorrectedText = rawTranscript) }
@@ -376,7 +382,12 @@ class ChatViewModel @Inject constructor(
             .replace("\n", "\\n")
             .replace("\r", "\\r")
             .replace("\t", "\\t")
-        return """{"type":"voice_correction_request","version":"1.0","instructions":"Fix transcription errors, punctuation, and grammar. Return ONLY valid JSON with a single field: {\"corrected_text\": \"...\"}","raw_transcript":"$escaped"}"""
+        val instructions = if (voiceLanguage.startsWith("tr")) {
+            "Transkripsiyon hatalarını, noktalama işaretlerini ve dil bilgisini düzelt. Yalnızca tek bir alanlı geçerli JSON döndür: {\\\"corrected_text\\\": \\\"...\\\"}"
+        } else {
+            "Fix transcription errors, punctuation, and grammar. Return ONLY valid JSON with a single field: {\\\"corrected_text\\\": \\\"...\\\"}"
+        }
+        return """{"type":"voice_correction_request","version":"1.0","language":"$voiceLanguage","instructions":"$instructions","raw_transcript":"$escaped"}"""
     }
 
     private fun parseCorrectedText(json: String): String? {
