@@ -10,8 +10,10 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -19,10 +21,12 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Image
@@ -32,9 +36,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -167,7 +173,9 @@ fun ChatScreen(
                 commandSuggestions = uiState.commandSuggestions,
                 onCommandSelected = viewModel::selectCommand,
                 onToggleCommandPicker = viewModel::toggleCommandPicker,
-                hasAvailableCommands = uiState.availableCommands.isNotEmpty()
+                hasAvailableCommands = uiState.availableCommands.isNotEmpty(),
+                showAttachmentPanel = uiState.showAttachmentPanel,
+                onToggleAttachmentPanel = viewModel::toggleAttachmentPanel
             )
         }
     ) { padding ->
@@ -561,6 +569,59 @@ private fun CommandSuggestionBar(
     }
 }
 
+@Composable
+private fun AttachmentPanel(
+    onPickImages: () -> Unit,
+    onToggleCommandPicker: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(32.dp)
+    ) {
+        AttachmentTile(
+            icon = { Icon(Icons.Default.Image, contentDescription = null, tint = Color.White) },
+            label = "Photos",
+            color = MaterialTheme.colorScheme.primary,
+            onClick = onPickImages
+        )
+        AttachmentTile(
+            icon = {
+                Text(
+                    "/",
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleLarge.copy(fontFamily = FontFamily.Monospace)
+                )
+            },
+            label = "Commands",
+            color = MaterialTheme.colorScheme.secondary,
+            onClick = onToggleCommandPicker
+        )
+    }
+}
+
+@Composable
+private fun AttachmentTile(
+    icon: @Composable () -> Unit,
+    label: String,
+    color: Color,
+    onClick: () -> Unit
+) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(
+            modifier = Modifier
+                .size(56.dp)
+                .clip(CircleShape)
+                .background(color)
+                .clickable(onClick = onClick),
+            contentAlignment = Alignment.Center
+        ) { icon() }
+        Spacer(Modifier.height(4.dp))
+        Text(label, style = MaterialTheme.typography.bodySmall)
+    }
+}
+
 @OptIn(androidx.compose.animation.ExperimentalAnimationApi::class)
 @Composable
 private fun MessageInputBar(
@@ -577,7 +638,9 @@ private fun MessageInputBar(
     commandSuggestions: List<AvailableCommand> = emptyList(),
     onCommandSelected: (AvailableCommand) -> Unit = {},
     onToggleCommandPicker: () -> Unit = {},
-    hasAvailableCommands: Boolean = false
+    hasAvailableCommands: Boolean = false,
+    showAttachmentPanel: Boolean = false,
+    onToggleAttachmentPanel: () -> Unit = {}
 ) {
     Surface(
         tonalElevation = 3.dp
@@ -587,6 +650,12 @@ private fun MessageInputBar(
                 .fillMaxWidth()
                 .padding(8.dp)
         ) {
+            AnimatedVisibility(visible = showAttachmentPanel) {
+                AttachmentPanel(
+                    onPickImages = { onPickImages(); onToggleAttachmentPanel() },
+                    onToggleCommandPicker = { onToggleCommandPicker(); onToggleAttachmentPanel() }
+                )
+            }
             CommandSuggestionBar(
                 suggestions = commandSuggestions,
                 onCommandSelected = onCommandSelected
@@ -638,37 +707,12 @@ private fun MessageInputBar(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Slash command picker button
-                val keyboardController = LocalSoftwareKeyboardController.current
-                IconButton(
-                    onClick = {
-                        keyboardController?.hide()
-                        onToggleCommandPicker()
-                    },
-                    enabled = hasAvailableCommands
-                ) {
-                    Text(
-                        "/",
-                        style = MaterialTheme.typography.titleLarge.copy(
-                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                            color = if (commandSuggestions.isNotEmpty())
-                                MaterialTheme.colorScheme.primary
-                            else
-                                MaterialTheme.colorScheme.onSurface.copy(
-                                    alpha = if (hasAvailableCommands) 1f else 0.38f
-                                )
-                        )
-                    )
-                }
-
-                // Photo picker button
-                IconButton(
-                    onClick = onPickImages,
-                    enabled = enabled
-                ) {
+                IconButton(onClick = onToggleAttachmentPanel) {
                     Icon(
-                        Icons.Default.Image,
-                        contentDescription = "Pick images"
+                        Icons.Default.Add,
+                        contentDescription = "Attachment menu",
+                        tint = if (showAttachmentPanel) MaterialTheme.colorScheme.primary
+                               else MaterialTheme.colorScheme.onSurface
                     )
                 }
 

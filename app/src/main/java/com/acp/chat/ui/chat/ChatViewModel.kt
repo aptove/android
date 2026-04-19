@@ -48,6 +48,7 @@ data class ChatUiState(
     val imageUrisByMessageId: Map<String, List<Uri>> = emptyMap(),
     val availableCommands: List<AvailableCommand> = emptyList(),
     val commandSuggestions: List<AvailableCommand> = emptyList(),
+    val showAttachmentPanel: Boolean = false,
 )
 
 @HiltViewModel
@@ -218,7 +219,11 @@ class ChatViewModel @Inject constructor(
             val q = text.drop(1).lowercase()
             _uiState.value.availableCommands.filter { q.isEmpty() || it.name.lowercase().startsWith(q) }
         } else emptyList()
-        _uiState.update { it.copy(inputText = text, commandSuggestions = suggestions) }
+        _uiState.update { it.copy(inputText = text, commandSuggestions = suggestions, showAttachmentPanel = false) }
+    }
+
+    fun toggleAttachmentPanel() {
+        _uiState.update { it.copy(showAttachmentPanel = !it.showAttachmentPanel) }
     }
 
     fun selectCommand(command: AvailableCommand) {
