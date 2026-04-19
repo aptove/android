@@ -226,6 +226,16 @@ class ChatViewModel @Inject constructor(
         _uiState.update { it.copy(inputText = text, commandSuggestions = emptyList()) }
     }
 
+    fun toggleCommandPicker() {
+        val current = _uiState.value
+        _uiState.update {
+            it.copy(
+                commandSuggestions = if (current.commandSuggestions.isNotEmpty()) emptyList()
+                                     else current.availableCommands
+            )
+        }
+    }
+
     fun onImagesSelected(uris: List<Uri>) {
         _uiState.update { it.copy(selectedImageUris = it.selectedImageUris + uris) }
     }
@@ -274,12 +284,14 @@ class ChatViewModel @Inject constructor(
 
             _uiState.update { it.copy(isSending = true, inputText = "", selectedImageUris = emptyList()) }
 
+            val msgType = if (text.startsWith("/") && !text.contains("\n")) MessageType.SLASH_COMMAND else MessageType.TEXT
             val result = sendMessageUseCase(
                 agentId = agentId,
                 session = session,
                 text = text,
                 images = imageBlocks,
-                userMessageId = userMsgId
+                userMessageId = userMsgId,
+                messageType = msgType
             )
 
             if (result.isFailure) {

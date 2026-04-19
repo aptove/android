@@ -66,8 +66,18 @@ class ACPClient @Inject constructor(
     private val pendingApprovals = mutableMapOf<String, CancellableContinuation<RequestPermissionResponse>>()
     var onToolApprovalRequest: ((String, String, String?, List<PermissionOption>) -> Unit)? = null
 
-    // Available commands callback (invoked from notify() in the operations factory)
+    // Cache of the last received available commands — populated before the callback fires
+    // so late subscribers can replay on first subscription.
+    private var cachedAvailableCommands: List<AvailableCommand> = emptyList()
+
+    // Available commands callback — replays the cache immediately when assigned if non-empty.
     var onAvailableCommandsUpdate: ((List<AvailableCommand>) -> Unit)? = null
+        set(value) {
+            field = value
+            if (value != null && cachedAvailableCommands.isNotEmpty()) {
+                scope.launch(Dispatchers.Main) { value(cachedAvailableCommands) }
+            }
+        }
 
     /**
      * Maximum number of reconnect-and-retry attempts when sendMessage fails
@@ -363,6 +373,7 @@ class ACPClient @Inject constructor(
                 override suspend fun notify(notification: SessionUpdate, _meta: JsonElement?) {
                     if (notification is SessionUpdate.AvailableCommandsUpdate) {
                         withContext(Dispatchers.Main) {
+                            cachedAvailableCommands = notification.availableCommands
                             onAvailableCommandsUpdate?.invoke(notification.availableCommands)
                         }
                     }

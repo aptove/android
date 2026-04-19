@@ -34,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -164,7 +165,9 @@ fun ChatScreen(
                 },
                 onRemoveImage = viewModel::removeImage,
                 commandSuggestions = uiState.commandSuggestions,
-                onCommandSelected = viewModel::selectCommand
+                onCommandSelected = viewModel::selectCommand,
+                onToggleCommandPicker = viewModel::toggleCommandPicker,
+                hasAvailableCommands = uiState.availableCommands.isNotEmpty()
             )
         }
     ) { padding ->
@@ -220,6 +223,17 @@ private fun MessageBubble(
 ) {
     val isUser = message.sender == MessageSender.USER
     val uiState by viewModel.uiState.collectAsState()
+
+    // Slash-command chip
+    if (message.type == MessageType.SLASH_COMMAND) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End
+        ) {
+            SlashCommandChip(text = message.text)
+        }
+        return
+    }
 
     // Tool approval message styling
     if (message.type == MessageType.TOOL_APPROVAL_REQUEST) {
@@ -476,6 +490,36 @@ private fun MessageBubble(
 }
 
 @Composable
+private fun SlashCommandChip(text: String) {
+    Surface(
+        shape = androidx.compose.foundation.shape.CircleShape,
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        tonalElevation = 2.dp
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                text = "/",
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                ),
+                color = MaterialTheme.colorScheme.primary
+            )
+            Text(
+                text = text.trimStart('/').trim(),
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                ),
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
 private fun CommandSuggestionBar(
     suggestions: List<AvailableCommand>,
     onCommandSelected: (AvailableCommand) -> Unit
@@ -531,7 +575,9 @@ private fun MessageInputBar(
     onPickImages: () -> Unit,
     onRemoveImage: (Int) -> Unit,
     commandSuggestions: List<AvailableCommand> = emptyList(),
-    onCommandSelected: (AvailableCommand) -> Unit = {}
+    onCommandSelected: (AvailableCommand) -> Unit = {},
+    onToggleCommandPicker: () -> Unit = {},
+    hasAvailableCommands: Boolean = false
 ) {
     Surface(
         tonalElevation = 3.dp
@@ -592,6 +638,29 @@ private fun MessageInputBar(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                // Slash command picker button
+                val keyboardController = LocalSoftwareKeyboardController.current
+                IconButton(
+                    onClick = {
+                        keyboardController?.hide()
+                        onToggleCommandPicker()
+                    },
+                    enabled = hasAvailableCommands
+                ) {
+                    Text(
+                        "/",
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                            color = if (commandSuggestions.isNotEmpty())
+                                MaterialTheme.colorScheme.primary
+                            else
+                                MaterialTheme.colorScheme.onSurface.copy(
+                                    alpha = if (hasAvailableCommands) 1f else 0.38f
+                                )
+                        )
+                    )
+                }
+
                 // Photo picker button
                 IconButton(
                     onClick = onPickImages,

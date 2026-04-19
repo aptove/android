@@ -1,6 +1,7 @@
 package com.acp.chat.domain.usecase
 
 import com.acp.chat.data.model.Message
+import com.acp.chat.data.model.MessageType
 import com.acp.chat.data.repository.MessageRepository
 import com.agentclientprotocol.client.ClientSession
 import com.agentclientprotocol.model.ContentBlock
@@ -16,7 +17,8 @@ class SendMessageUseCase @Inject constructor(
         session: ClientSession,
         text: String,
         images: List<ContentBlock.Image> = emptyList(),
-        userMessageId: String = UUID.randomUUID().toString()
+        userMessageId: String = UUID.randomUUID().toString(),
+        messageType: MessageType = MessageType.TEXT
     ): Result<Flow<Message>> {
         if (text.isBlank() && images.isEmpty()) {
             return Result.failure(Exception("Message cannot be empty"))
@@ -26,6 +28,6 @@ class SendMessageUseCase @Inject constructor(
             return Result.failure(Exception("Message too long (max 10,000 characters)"))
         }
 
-        return messageRepository.sendMessage(agentId, session, text, images, userMessageId)
+        return messageRepository.sendMessage(agentId, session, text, images, userMessageId, messageType)
     }
 }

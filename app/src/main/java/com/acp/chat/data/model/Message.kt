@@ -23,7 +23,8 @@ enum class MessageType {
     TEXT,
     TOOL_APPROVAL_REQUEST,
     THOUGHT,
-    TOOL_STATUS
+    TOOL_STATUS,
+    SLASH_COMMAND
 }
 
 data class PermissionOptionInfo(

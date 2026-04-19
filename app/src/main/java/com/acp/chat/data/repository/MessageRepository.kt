@@ -35,7 +35,8 @@ class MessageRepository @Inject constructor(
         session: ClientSession,
         text: String,
         images: List<ContentBlock.Image> = emptyList(),
-        userMessageId: String = UUID.randomUUID().toString()
+        userMessageId: String = UUID.randomUUID().toString(),
+        messageType: MessageType = MessageType.TEXT
     ): Result<Flow<Message>> {
         // Build content blocks: images first, then text
         val contentBlocks = mutableListOf<ContentBlock>()
@@ -51,7 +52,8 @@ class MessageRepository @Inject constructor(
             agentId = agentId,
             text = displayText,
             sender = MessageSender.USER,
-            status = MessageStatus.SENDING
+            status = MessageStatus.SENDING,
+            type = messageType
         )
 
         messageDao.insertMessage(userMessage)
