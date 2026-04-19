@@ -20,6 +20,7 @@ import com.acp.chat.data.repository.MessageRepository
 import com.acp.chat.domain.AgentManager
 import com.acp.chat.domain.usecase.SendMessageUseCase
 import com.agentclientprotocol.client.ClientSession
+import com.agentclientprotocol.model.AvailableCommand
 import com.agentclientprotocol.model.ContentBlock
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -45,6 +46,8 @@ data class ChatUiState(
     val voiceCorrectedText: String? = null,
     val selectedImageUris: List<Uri> = emptyList(),
     val imageUrisByMessageId: Map<String, List<Uri>> = emptyMap(),
+    val availableCommands: List<AvailableCommand> = emptyList(),
+    val commandSuggestions: List<AvailableCommand> = emptyList(),
 )
 
 @HiltViewModel
@@ -66,6 +69,7 @@ class ChatViewModel @Inject constructor(
         loadMessages()
         connectToAgent()
         setupToolApprovalHandler()
+        setupCommandHandler()
     }
 
     private fun loadAgent() {
@@ -200,8 +204,26 @@ class ChatViewModel @Inject constructor(
         }
     }
 
+    private fun setupCommandHandler() {
+        viewModelScope.launch {
+            val acpClient = agentManager.getACPClient()
+            acpClient.onAvailableCommandsUpdate = { commands ->
+                _uiState.update { it.copy(availableCommands = commands) }
+            }
+        }
+    }
+
     fun updateInputText(text: String) {
-        _uiState.update { it.copy(inputText = text) }
+        val suggestions = if (text.startsWith("/") && !text.contains(" ")) {
+            val q = text.drop(1).lowercase()
+            _uiState.value.availableCommands.filter { q.isEmpty() || it.name.lowercase().startsWith(q) }
+        } else emptyList()
+        _uiState.update { it.copy(inputText = text, commandSuggestions = suggestions) }
+    }
+
+    fun selectCommand(command: AvailableCommand) {
+        val text = if (command.input != null) "/${command.name} " else "/${command.name}"
+        _uiState.update { it.copy(inputText = text, commandSuggestions = emptyList()) }
     }
 
     fun onImagesSelected(uris: List<Uri>) {

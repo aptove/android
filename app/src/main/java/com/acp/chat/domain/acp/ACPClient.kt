@@ -66,6 +66,9 @@ class ACPClient @Inject constructor(
     private val pendingApprovals = mutableMapOf<String, CancellableContinuation<RequestPermissionResponse>>()
     var onToolApprovalRequest: ((String, String, String?, List<PermissionOption>) -> Unit)? = null
 
+    // Available commands callback (invoked from notify() in the operations factory)
+    var onAvailableCommandsUpdate: ((List<AvailableCommand>) -> Unit)? = null
+
     /**
      * Maximum number of reconnect-and-retry attempts when sendMessage fails
      * due to a transport error (e.g. dead WebSocket). Default is 1.
@@ -358,7 +361,11 @@ class ACPClient @Inject constructor(
                 }
                 
                 override suspend fun notify(notification: SessionUpdate, _meta: JsonElement?) {
-                    // Handle notifications if needed
+                    if (notification is SessionUpdate.AvailableCommandsUpdate) {
+                        withContext(Dispatchers.Main) {
+                            onAvailableCommandsUpdate?.invoke(notification.availableCommands)
+                        }
+                    }
                 }
             }
         }

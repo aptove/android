@@ -43,6 +43,7 @@ import com.acp.chat.data.model.Message
 import com.acp.chat.data.model.MessageSender
 import com.acp.chat.data.model.MessageStatus
 import com.acp.chat.data.model.MessageType
+import com.agentclientprotocol.model.AvailableCommand
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
@@ -161,7 +162,9 @@ fun ChatScreen(
                         PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                     )
                 },
-                onRemoveImage = viewModel::removeImage
+                onRemoveImage = viewModel::removeImage,
+                commandSuggestions = uiState.commandSuggestions,
+                onCommandSelected = viewModel::selectCommand
             )
         }
     ) { padding ->
@@ -472,6 +475,48 @@ private fun MessageBubble(
     }
 }
 
+@Composable
+private fun CommandSuggestionBar(
+    suggestions: List<AvailableCommand>,
+    onCommandSelected: (AvailableCommand) -> Unit
+) {
+    if (suggestions.isEmpty()) return
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(max = 200.dp),
+        tonalElevation = 6.dp,
+        shadowElevation = 4.dp
+    ) {
+        LazyColumn {
+            items(suggestions, key = { it.name }) { command ->
+                ListItem(
+                    headlineContent = {
+                        Text(
+                            text = "/${command.name}",
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                            )
+                        )
+                    },
+                    supportingContent = {
+                        Text(
+                            text = command.description,
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                        )
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .combinedClickable(onClick = { onCommandSelected(command) })
+                )
+                HorizontalDivider()
+            }
+        }
+    }
+}
+
 @OptIn(androidx.compose.animation.ExperimentalAnimationApi::class)
 @Composable
 private fun MessageInputBar(
@@ -484,7 +529,9 @@ private fun MessageInputBar(
     enabled: Boolean,
     selectedImages: List<Uri>,
     onPickImages: () -> Unit,
-    onRemoveImage: (Int) -> Unit
+    onRemoveImage: (Int) -> Unit,
+    commandSuggestions: List<AvailableCommand> = emptyList(),
+    onCommandSelected: (AvailableCommand) -> Unit = {}
 ) {
     Surface(
         tonalElevation = 3.dp
@@ -494,6 +541,10 @@ private fun MessageInputBar(
                 .fillMaxWidth()
                 .padding(8.dp)
         ) {
+            CommandSuggestionBar(
+                suggestions = commandSuggestions,
+                onCommandSelected = onCommandSelected
+            )
             // Image thumbnail strip
             if (selectedImages.isNotEmpty()) {
                 LazyRow(
