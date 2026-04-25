@@ -24,6 +24,9 @@ import io.ktor.client.plugins.websocket.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.OkHttpClient
 import java.security.MessageDigest
 import java.security.cert.X509Certificate
@@ -45,6 +48,9 @@ data class ToolApprovalRequest(
 class ACPClient @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
+
+    /** Stable identifier for this device's connection, sent as X-Client-Id header. */
+    val deviceClientId: String = java.util.UUID.randomUUID().toString()
 
     private var httpClient: HttpClient? = null
 
@@ -78,6 +84,9 @@ class ACPClient @Inject constructor(
                 scope.launch(Dispatchers.Main) { value(cachedAvailableCommands) }
             }
         }
+
+    /** Callback invoked when another device sends a user message to the same session. */
+    var onRemoteUserMessage: ((String) -> Unit)? = null
 
     /**
      * Maximum number of reconnect-and-retry attempts when sendMessage fails
@@ -194,16 +203,29 @@ class ACPClient @Inject constructor(
                 if (!config.authToken.isNullOrBlank()) {
                     headers.append("X-Bridge-Token", config.authToken)
                 }
+
+                // Send client ID for multi-device message sync
+                headers.append("X-Client-Id", deviceClientId)
             }
 
             protocol = newProtocol
-            
+
             // Create ACP client
             val newClient = Client(newProtocol)
             client = newClient
 
             // Start the protocol
             newProtocol.start()
+
+            // Register handler for bridge/remoteUserMessage (multi-device sync)
+            @Suppress("UNCHECKED_CAST")
+            val remoteUserMsgMethod = AcpMethod.AcpNotificationMethod<CancelRequestNotification>(
+                "bridge/remoteUserMessage",
+                CancelRequestNotification.serializer() as kotlinx.serialization.KSerializer<CancelRequestNotification>
+            )
+            newProtocol.setNotificationHandlerRaw(remoteUserMsgMethod) { notification ->
+                handleBridgeRemoteUserMessage(notification)
+            }
 
             // Initialize handshake with terminal support
             val agentInfo = newClient.initialize(
@@ -553,6 +575,31 @@ class ACPClient @Inject constructor(
             ) {}
         } else {
             android.util.Log.w("ACPClient", "⚠️ No pending rejection found for toolCallId: $toolCallId")
+        }
+    }
+
+    /**
+     * Handle bridge/remoteUserMessage notification — echoed by the bridge when another
+     * device sends a session/prompt. Ignores our own echoes via deviceClientId comparison.
+     */
+    private fun handleBridgeRemoteUserMessage(notification: JsonRpcNotification) {
+        val params = notification.params?.jsonObject ?: return
+        val senderId = params["senderId"]?.jsonPrimitive?.content ?: return
+        if (senderId == deviceClientId) return // own echo — ignore
+
+        val contentArray = params["content"]?.jsonArray ?: return
+        val text = contentArray.mapNotNull { block ->
+            val obj = block.jsonObject
+            // ACP content block: { "contentBlock": "text", "text": "..." }
+            if (obj["contentBlock"]?.jsonPrimitive?.content == "text") {
+                obj["text"]?.jsonPrimitive?.content
+            } else null
+        }.joinToString("")
+
+        if (text.isNotEmpty()) {
+            scope.launch(Dispatchers.Main) {
+                onRemoteUserMessage?.invoke(text)
+            }
         }
     }
 

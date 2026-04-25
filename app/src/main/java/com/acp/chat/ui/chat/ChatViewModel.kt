@@ -107,6 +107,20 @@ class ChatViewModel @Inject constructor(
     private fun setupToolApprovalHandler() {
         viewModelScope.launch {
             val acpClient = agentManager.getACPClient()
+
+            acpClient.onRemoteUserMessage = { text ->
+                viewModelScope.launch {
+                    val message = Message(
+                        agentId = agentId,
+                        text = text,
+                        sender = MessageSender.USER,
+                        status = MessageStatus.SENT,
+                        type = MessageType.TEXT
+                    )
+                    messageRepository.insertMessage(message)
+                }
+            }
+
             acpClient.onToolApprovalRequest = { toolCallId, title, command, options ->
                 android.util.Log.d("ChatViewModel", "Tool approval request: $title, options: ${options.size}")
                 viewModelScope.launch {
