@@ -9,13 +9,11 @@ import java.util.UUID
 /** Priority constants — lower value = higher priority in fallback order. */
 object TransportPriority {
     const val TAILSCALE_SERVE = 0
-    const val TAILSCALE_IP    = 1
-    const val CLOUDFLARE      = 2
-    const val LOCAL           = 3
+    const val CLOUDFLARE      = 1
+    const val LOCAL           = 2
 
     fun forTransport(transport: String): Int = when (transport) {
         "tailscale-serve" -> TAILSCALE_SERVE
-        "tailscale-ip"    -> TAILSCALE_IP
         "cloudflare"      -> CLOUDFLARE
         else              -> LOCAL
     }
