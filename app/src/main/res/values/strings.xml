@@ -127,6 +127,6 @@
     <string name="qr_pairing_code_label">Pairing Code</string>
     <string name="qr_pairing_code_hint">6-digit code shown in the bridge terminal</string>
     <string name="qr_certificate_fingerprint">Certificate Fingerprint (optional)</string>
-    <string name="qr_fingerprint_hint">Optional: Validates the bridge's TLS certificate</string>
+    <string name="qr_fingerprint_hint">Optional: Validates the bridge\'s TLS certificate</string>
     <string name="connect">Connect</string>
 </resources>

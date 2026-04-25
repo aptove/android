@@ -527,6 +527,7 @@ private fun SlashCommandChip(text: String) {
     }
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 private fun CommandSuggestionBar(
     suggestions: List<AvailableCommand>,
