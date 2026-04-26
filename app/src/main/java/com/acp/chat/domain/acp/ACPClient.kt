@@ -89,6 +89,12 @@ class ACPClient @Inject constructor(
     var onRemoteUserMessage: ((String) -> Unit)? = null
 
     /**
+     * Callback invoked when an agent text chunk arrives for a prompt initiated by another device.
+     * Called for each AgentMessageChunk notification received while no local prompt is active.
+     */
+    var onPassiveAgentChunk: ((String) -> Unit)? = null
+
+    /**
      * Maximum number of reconnect-and-retry attempts when sendMessage fails
      * due to a transport error (e.g. dead WebSocket). Default is 1.
      */
@@ -393,11 +399,23 @@ class ACPClient @Inject constructor(
                 }
                 
                 override suspend fun notify(notification: SessionUpdate, _meta: JsonElement?) {
-                    if (notification is SessionUpdate.AvailableCommandsUpdate) {
-                        withContext(Dispatchers.Main) {
-                            cachedAvailableCommands = notification.availableCommands
-                            onAvailableCommandsUpdate?.invoke(notification.availableCommands)
+                    when (notification) {
+                        is SessionUpdate.AvailableCommandsUpdate -> {
+                            withContext(Dispatchers.Main) {
+                                cachedAvailableCommands = notification.availableCommands
+                                onAvailableCommandsUpdate?.invoke(notification.availableCommands)
+                            }
                         }
+                        is SessionUpdate.AgentMessageChunk -> {
+                            // Passive agent response — prompt was initiated by another device
+                            val text = (notification.content as? ContentBlock.Text)?.text
+                            if (!text.isNullOrEmpty()) {
+                                withContext(Dispatchers.Main) {
+                                    onPassiveAgentChunk?.invoke(text)
+                                }
+                            }
+                        }
+                        else -> { /* other update types not handled passively */ }
                     }
                 }
             }
@@ -590,8 +608,8 @@ class ACPClient @Inject constructor(
         val contentArray = params["content"]?.jsonArray ?: return
         val text = contentArray.mapNotNull { block ->
             val obj = block.jsonObject
-            // ACP content block: { "contentBlock": "text", "text": "..." }
-            if (obj["contentBlock"]?.jsonPrimitive?.content == "text") {
+            // ACP content block: { "type": "text", "text": "..." }
+            if (obj["type"]?.jsonPrimitive?.content == "text") {
                 obj["text"]?.jsonPrimitive?.content
             } else null
         }.joinToString("")

@@ -62,6 +62,10 @@ class ChatViewModel @Inject constructor(
 
     private val agentId: String = checkNotNull(savedStateHandle["agentId"])
 
+    // Tracks the in-progress agent message row for a remotely-initiated prompt.
+    // Null when no passive response is streaming.
+    private var passiveAgentMessageId: String? = null
+
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
 
@@ -108,8 +112,32 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             val acpClient = agentManager.getACPClient()
 
+            acpClient.onPassiveAgentChunk = { text ->
+                viewModelScope.launch {
+                    val msgId = passiveAgentMessageId
+                    if (msgId == null) {
+                        val agentMsg = Message(
+                            agentId = agentId,
+                            text = text,
+                            sender = MessageSender.AGENT,
+                            status = MessageStatus.SENT,
+                            type = MessageType.TEXT
+                        )
+                        messageRepository.insertMessage(agentMsg)
+                        passiveAgentMessageId = agentMsg.id
+                    } else {
+                        messageRepository.appendToMessage(msgId, text)
+                    }
+                }
+            }
+
             acpClient.onRemoteUserMessage = { text ->
                 viewModelScope.launch {
+                    // Seal any in-progress passive agent message before showing the new user message
+                    passiveAgentMessageId?.let { msgId ->
+                        messageRepository.updateMessageStatus(msgId, MessageStatus.DELIVERED)
+                        passiveAgentMessageId = null
+                    }
                     val message = Message(
                         agentId = agentId,
                         text = text,
