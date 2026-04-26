@@ -480,6 +480,14 @@ class ChatViewModel @Inject constructor(
         }
     }
 
+    fun sendMemoryEntry(text: String) {
+        val trimmed = text.trim()
+        if (trimmed.isEmpty()) return
+        viewModelScope.launch {
+            agentManager.getACPClient().sendMemoryEntry(trimmed)
+        }
+    }
+
     override fun onCleared() {
         super.onCleared()
         // Don't disconnect when leaving chat screen - keep the session alive

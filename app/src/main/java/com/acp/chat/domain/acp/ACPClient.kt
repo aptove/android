@@ -653,6 +653,16 @@ class ACPClient @Inject constructor(
     }
 
     /**
+     * Append a memory entry to the bridge's MEMORY.md file.
+     */
+    fun sendMemoryEntry(text: String) {
+        val params = kotlinx.serialization.json.buildJsonObject {
+            put("text", kotlinx.serialization.json.JsonPrimitive(text))
+        }
+        sendBridgeNotification("bridge/appendMemory", params)
+    }
+
+    /**
      * Unregister an FCM push token from the bridge
      */
     fun unregisterPushToken(deviceToken: String) {

@@ -16,6 +16,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -33,6 +34,7 @@ import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -67,6 +69,7 @@ fun ChatScreen(
     val coroutineScope = rememberCoroutineScope()
     val voiceState by voiceInputViewModel.recordingState.collectAsState()
     val rawTranscript by voiceInputViewModel.rawTranscript.collectAsState()
+    var showMemoryDialog by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("settings", Context.MODE_PRIVATE) }
@@ -175,8 +178,15 @@ fun ChatScreen(
                 onToggleCommandPicker = viewModel::toggleCommandPicker,
                 hasAvailableCommands = uiState.availableCommands.isNotEmpty(),
                 showAttachmentPanel = uiState.showAttachmentPanel,
-                onToggleAttachmentPanel = viewModel::toggleAttachmentPanel
+                onToggleAttachmentPanel = viewModel::toggleAttachmentPanel,
+                onOpenMemory = { showMemoryDialog = true }
             )
+            if (showMemoryDialog) {
+                MemoryEntryDialog(
+                    onDismiss = { showMemoryDialog = false },
+                    onSave = { text -> viewModel.sendMemoryEntry(text); showMemoryDialog = false }
+                )
+            }
         }
     ) { padding ->
         LazyColumn(
@@ -573,7 +583,8 @@ private fun CommandSuggestionBar(
 @Composable
 private fun AttachmentPanel(
     onPickImages: () -> Unit,
-    onToggleCommandPicker: () -> Unit
+    onToggleCommandPicker: () -> Unit,
+    onOpenMemory: () -> Unit = {}
 ) {
     Row(
         modifier = Modifier
@@ -598,6 +609,12 @@ private fun AttachmentPanel(
             label = "Commands",
             color = MaterialTheme.colorScheme.secondary,
             onClick = onToggleCommandPicker
+        )
+        AttachmentTile(
+            icon = { Text("🧠", style = MaterialTheme.typography.titleLarge) },
+            label = "Memory",
+            color = MaterialTheme.colorScheme.tertiary,
+            onClick = onOpenMemory
         )
     }
 }
@@ -641,7 +658,8 @@ private fun MessageInputBar(
     onToggleCommandPicker: () -> Unit = {},
     hasAvailableCommands: Boolean = false,
     showAttachmentPanel: Boolean = false,
-    onToggleAttachmentPanel: () -> Unit = {}
+    onToggleAttachmentPanel: () -> Unit = {},
+    onOpenMemory: () -> Unit = {}
 ) {
     Surface(
         tonalElevation = 3.dp
@@ -654,7 +672,8 @@ private fun MessageInputBar(
             AnimatedVisibility(visible = showAttachmentPanel) {
                 AttachmentPanel(
                     onPickImages = { onPickImages(); onToggleAttachmentPanel() },
-                    onToggleCommandPicker = { onToggleCommandPicker(); onToggleAttachmentPanel() }
+                    onToggleCommandPicker = { onToggleCommandPicker(); onToggleAttachmentPanel() },
+                    onOpenMemory = { onOpenMemory(); onToggleAttachmentPanel() }
                 )
             }
             CommandSuggestionBar(
@@ -766,4 +785,86 @@ private fun MessageInputBar(
             }
         }
     }
+}
+
+@Composable
+private fun MemoryEntryDialog(
+    onDismiss: () -> Unit,
+    onSave: (String) -> Unit,
+    voiceInputViewModel: VoiceInputViewModel = hiltViewModel()
+) {
+    var text by remember { mutableStateOf("") }
+    val voiceState by voiceInputViewModel.recordingState.collectAsState()
+    val rawTranscript by voiceInputViewModel.rawTranscript.collectAsState()
+    val context = LocalContext.current
+
+    // Append transcript to text when voice recognition finishes
+    LaunchedEffect(rawTranscript) {
+        rawTranscript?.let { transcript ->
+            text += (if (text.isEmpty()) "" else " ") + transcript
+            voiceInputViewModel.clearTranscript()
+        }
+    }
+
+    val micPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) voiceInputViewModel.startRecording()
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Add Memory") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    placeholder = { Text("What do you want the AI to remember?") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 120.dp),
+                    minLines = 4
+                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val isRecording = voiceState is RecordingState.Recording
+                    IconButton(onClick = {
+                        if (isRecording) {
+                            voiceInputViewModel.stopRecording()
+                        } else {
+                            micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                        }
+                    }) {
+                        Icon(
+                            imageVector = Icons.Default.Mic,
+                            contentDescription = if (isRecording) "Stop recording" else "Start recording",
+                            tint = if (isRecording) MaterialTheme.colorScheme.error
+                                   else MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    Text(
+                        text = when {
+                            voiceState is RecordingState.Recording -> "Recording…"
+                            voiceState is RecordingState.Processing -> "Transcribing…"
+                            else -> "Tap mic to dictate"
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { if (text.isNotBlank()) onSave(text.trim()) },
+                enabled = text.isNotBlank()
+            ) { Text("Save") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
 }
