@@ -480,6 +480,28 @@ class ChatViewModel @Inject constructor(
         }
     }
 
+    suspend fun correctTranscript(rawTranscript: String): String {
+        val session = _uiState.value.session ?: return rawTranscript
+        val correctionJson = buildCorrectionJson(rawTranscript)
+        var accumulated = ""
+        return try {
+            agentManager.getACPClient()
+                .sendMessage(session, listOf(ContentBlock.Text(correctionJson)))
+                .collect { msg ->
+                    when (msg) {
+                        is com.acp.chat.domain.acp.ACPMessage.TextChunk -> accumulated += msg.text
+                        is com.acp.chat.domain.acp.ACPMessage.Complete -> { /* done */ }
+                        is com.acp.chat.domain.acp.ACPMessage.Error -> throw Exception(msg.message)
+                        else -> { /* ignore */ }
+                    }
+                }
+            parseCorrectedText(accumulated) ?: rawTranscript
+        } catch (e: Exception) {
+            android.util.Log.w("ChatViewModel", "Voice correction failed, using raw transcript", e)
+            rawTranscript
+        }
+    }
+
     fun sendMemoryEntry(text: String) {
         val trimmed = text.trim()
         if (trimmed.isEmpty()) return

@@ -184,7 +184,8 @@ fun ChatScreen(
             if (showMemoryDialog) {
                 MemoryEntryDialog(
                     onDismiss = { showMemoryDialog = false },
-                    onSave = { text -> viewModel.sendMemoryEntry(text); showMemoryDialog = false }
+                    onSave = { text -> viewModel.sendMemoryEntry(text); showMemoryDialog = false },
+                    onCorrectTranscript = { viewModel.correctTranscript(it) }
                 )
             }
         }
@@ -791,18 +792,22 @@ private fun MessageInputBar(
 private fun MemoryEntryDialog(
     onDismiss: () -> Unit,
     onSave: (String) -> Unit,
+    onCorrectTranscript: suspend (String) -> String,
     voiceInputViewModel: VoiceInputViewModel = hiltViewModel()
 ) {
     var text by remember { mutableStateOf("") }
+    var isCorrectingTranscript by remember { mutableStateOf(false) }
     val voiceState by voiceInputViewModel.recordingState.collectAsState()
     val rawTranscript by voiceInputViewModel.rawTranscript.collectAsState()
-    val context = LocalContext.current
 
-    // Append transcript to text when voice recognition finishes
+    // When voice recognition finishes, run AI correction then append result
     LaunchedEffect(rawTranscript) {
         rawTranscript?.let { transcript ->
-            text += (if (text.isEmpty()) "" else " ") + transcript
             voiceInputViewModel.clearTranscript()
+            isCorrectingTranscript = true
+            val corrected = onCorrectTranscript(transcript)
+            text += (if (text.isEmpty()) "" else " ") + corrected
+            isCorrectingTranscript = false
         }
     }
 
@@ -831,13 +836,16 @@ private fun MemoryEntryDialog(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     val isRecording = voiceState is RecordingState.Recording
-                    IconButton(onClick = {
-                        if (isRecording) {
-                            voiceInputViewModel.stopRecording()
-                        } else {
-                            micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                        }
-                    }) {
+                    IconButton(
+                        onClick = {
+                            if (isRecording) {
+                                voiceInputViewModel.stopRecording()
+                            } else {
+                                micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                            }
+                        },
+                        enabled = !isCorrectingTranscript
+                    ) {
                         Icon(
                             imageVector = Icons.Default.Mic,
                             contentDescription = if (isRecording) "Stop recording" else "Start recording",
@@ -845,14 +853,25 @@ private fun MemoryEntryDialog(
                                    else MaterialTheme.colorScheme.primary
                         )
                     }
+                    if (isCorrectingTranscript) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(Modifier.width(4.dp))
+                    }
                     Text(
                         text = when {
+                            isCorrectingTranscript -> "Correcting…"
                             voiceState is RecordingState.Recording -> "Recording…"
                             voiceState is RecordingState.Processing -> "Transcribing…"
                             else -> "Tap mic to dictate"
                         },
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = if (isCorrectingTranscript || voiceState is RecordingState.Recording)
+                            MaterialTheme.colorScheme.primary
+                        else
+                            MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -860,7 +879,7 @@ private fun MemoryEntryDialog(
         confirmButton = {
             TextButton(
                 onClick = { if (text.isNotBlank()) onSave(text.trim()) },
-                enabled = text.isNotBlank()
+                enabled = text.isNotBlank() && !isCorrectingTranscript
             ) { Text("Save") }
         },
         dismissButton = {
