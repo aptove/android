@@ -61,6 +61,7 @@ import java.util.*
 @Composable
 fun ChatScreen(
     onNavigateBack: () -> Unit,
+    isVerboseMode: Boolean = true,
     viewModel: ChatViewModel = hiltViewModel(),
     voiceInputViewModel: VoiceInputViewModel = hiltViewModel()
 ) {
@@ -110,10 +111,12 @@ fun ChatScreen(
         }
     }
 
-    LaunchedEffect(uiState.messages.size) {
-        if (uiState.messages.isNotEmpty()) {
+    LaunchedEffect(uiState.messages.size, isVerboseMode) {
+        val visibleCount = if (isVerboseMode) uiState.messages.size
+            else uiState.messages.count { it.type != MessageType.THOUGHT && it.type != MessageType.TOOL_STATUS }
+        if (visibleCount > 0) {
             coroutineScope.launch {
-                listState.animateScrollToItem(uiState.messages.size - 1)
+                listState.animateScrollToItem(visibleCount - 1)
             }
         }
     }
@@ -199,7 +202,9 @@ fun ChatScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp),
             contentPadding = PaddingValues(vertical = 16.dp)
         ) {
-            items(uiState.messages, key = { it.id }) { message ->
+            val visibleMessages = if (isVerboseMode) uiState.messages
+                else uiState.messages.filter { it.type != MessageType.THOUGHT && it.type != MessageType.TOOL_STATUS }
+            items(visibleMessages, key = { it.id }) { message ->
                 MessageBubble(
                     message = message,
                     viewModel = viewModel

@@ -12,6 +12,7 @@ import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -40,6 +41,8 @@ fun SettingsScreen(
     onNavigateBack: () -> Unit,
     isDarkMode: Boolean,
     onDarkModeChange: (Boolean) -> Unit,
+    isVerboseMode: Boolean,
+    onVerboseModeChange: (Boolean) -> Unit,
     currentLanguage: String,
     onLanguageChange: (String) -> Unit,
     currentVoiceLanguage: String,
@@ -157,6 +160,23 @@ fun SettingsScreen(
                         )
                     },
                     modifier = Modifier.clickable { onDarkModeChange(!isDarkMode) }
+                )
+                HorizontalDivider()
+                ListItem(
+                    headlineContent = { Text(stringResource(R.string.settings_verbose_messages)) },
+                    supportingContent = {
+                        Text(if (isVerboseMode) stringResource(R.string.settings_verbose_messages_on) else stringResource(R.string.settings_verbose_messages_off))
+                    },
+                    leadingContent = {
+                        Icon(Icons.Default.Chat, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    },
+                    trailingContent = {
+                        Switch(
+                            checked = isVerboseMode,
+                            onCheckedChange = onVerboseModeChange
+                        )
+                    },
+                    modifier = Modifier.clickable { onVerboseModeChange(!isVerboseMode) }
                 )
                 HorizontalDivider()
             }

@@ -63,6 +63,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             var isDarkMode by remember { mutableStateOf(prefs.getBoolean("is_dark_mode", true)) }
+            var isVerboseMode by remember { mutableStateOf(prefs.getBoolean("is_verbose_mode", true)) }
             var currentLanguage by remember {
                 mutableStateOf(prefs.getString("app_language", null) ?: defaultLang)
             }
@@ -115,7 +116,8 @@ class MainActivity : ComponentActivity() {
                             )
                         ) {
                             ChatScreen(
-                                onNavigateBack = { navController.popBackStack() }
+                                onNavigateBack = { navController.popBackStack() },
+                                isVerboseMode = isVerboseMode
                             )
                         }
 
@@ -137,6 +139,11 @@ class MainActivity : ComponentActivity() {
                                 onDarkModeChange = { dark ->
                                     isDarkMode = dark
                                     prefs.edit().putBoolean("is_dark_mode", dark).apply()
+                                },
+                                isVerboseMode = isVerboseMode,
+                                onVerboseModeChange = { verbose ->
+                                    isVerboseMode = verbose
+                                    prefs.edit().putBoolean("is_verbose_mode", verbose).apply()
                                 },
                                 currentLanguage = currentLanguage,
                                 onLanguageChange = { lang ->

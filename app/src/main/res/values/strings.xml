@@ -104,6 +104,9 @@
     <string name="settings_dark_mode">Screen Mode</string>
     <string name="settings_dark_theme_active">Dark theme active</string>
     <string name="settings_light_theme_active">Light theme active</string>
+    <string name="settings_verbose_messages">Verbose Messages</string>
+    <string name="settings_verbose_messages_on">Showing thoughts and tool calls</string>
+    <string name="settings_verbose_messages_off">Hiding thoughts and tool calls</string>
     <string name="settings_language">Language</string>
     <string name="settings_voice_language">Voice Language</string>
     <string name="language_english">English</string>

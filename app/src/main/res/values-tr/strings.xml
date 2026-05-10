@@ -92,6 +92,9 @@
     <string name="settings_dark_mode">Ekran Modu</string>
     <string name="settings_dark_theme_active">Karanlık tema etkin</string>
     <string name="settings_light_theme_active">Açık tema etkin</string>
+    <string name="settings_verbose_messages">Ayrıntılı Mesajlar</string>
+    <string name="settings_verbose_messages_on">Düşünceler ve araç çağrıları gösteriliyor</string>
+    <string name="settings_verbose_messages_off">Düşünceler ve araç çağrıları gizleniyor</string>
     <string name="settings_language">Dil</string>
     <string name="settings_voice_language">Ses Dili</string>
     <string name="language_english">English</string>
