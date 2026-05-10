@@ -423,13 +423,15 @@ private fun MessageBubble(
     val imageUris = if (isUser) uiState.imageUrisByMessageId[message.id] else null
     val context = LocalContext.current
 
+    val hasCode = displayText.contains("```")
+
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start
+        horizontalArrangement = if (isUser && !hasCode) Arrangement.End else Arrangement.Start
     ) {
         Surface(
             modifier = Modifier
-                .fillMaxWidth()
+                .then(if (hasCode) Modifier.fillMaxWidth() else Modifier.widthIn(max = 280.dp))
                 .then(
                     if (!isUser && displayText.isNotBlank()) {
                         Modifier.combinedClickable(
