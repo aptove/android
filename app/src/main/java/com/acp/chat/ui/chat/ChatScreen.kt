@@ -429,7 +429,7 @@ private fun MessageBubble(
     ) {
         Surface(
             modifier = Modifier
-                .then(if (!isUser) Modifier.fillMaxWidth() else Modifier.widthIn(max = 280.dp))
+                .then(if (isUser) Modifier.widthIn(max = 280.dp) else Modifier)
                 .then(
                     if (!isUser && displayText.isNotBlank()) {
                         Modifier.combinedClickable(
