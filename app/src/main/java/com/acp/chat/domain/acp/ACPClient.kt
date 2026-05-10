@@ -2,6 +2,7 @@ package com.acp.chat.domain.acp
 
 import android.content.Context
 import android.util.Log
+import java.util.concurrent.ConcurrentHashMap
 import com.acp.chat.data.model.ConnectionConfig
 import dagger.hilt.android.qualifiers.ApplicationContext
 import com.agentclientprotocol.agent.AgentInfo
@@ -68,8 +69,8 @@ class ACPClient @Inject constructor(
     private val _connectionState = MutableStateFlow<ACPConnectionState>(ACPConnectionState.Disconnected)
     val connectionState: StateFlow<ACPConnectionState> = _connectionState.asStateFlow()
     
-    // Tool approval management
-    private val pendingApprovals = mutableMapOf<String, CancellableContinuation<RequestPermissionResponse>>()
+    // Tool approval management — ConcurrentHashMap for safe access from IO + Main dispatchers
+    private val pendingApprovals = ConcurrentHashMap<String, CancellableContinuation<RequestPermissionResponse>>()
     var onToolApprovalRequest: ((String, String, String?, List<PermissionOption>) -> Unit)? = null
 
     // Cache of the last received available commands — populated before the callback fires

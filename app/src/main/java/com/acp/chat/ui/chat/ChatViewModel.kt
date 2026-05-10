@@ -93,17 +93,12 @@ class ChatViewModel @Inject constructor(
                     _uiState.update { it.copy(error = e.message) }
                 }
                 .collect { messages ->
-                    // Rebuild pendingApprovalOptions from unresolved approval messages persisted in DB
-                    val pendingOptions = messages
-                        .filter { it.type == MessageType.TOOL_APPROVAL_REQUEST && it.toolApproved == null }
-                        .mapNotNull { msg ->
-                            val options = msg.toolOptions?.let { deserializeOptions(it) }
-                                ?.takeIf { it.isNotEmpty() }
-                                ?: return@mapNotNull null
-                            msg.id to options
-                        }
-                        .toMap()
-                    _uiState.update { it.copy(messages = messages, pendingApprovalOptions = pendingOptions) }
+                    // Drop unanswered approval cards from previous sessions — their continuations
+                    // are gone after a restart and tapping them would be a no-op.
+                    val displayMessages = messages.filter {
+                        it.type != MessageType.TOOL_APPROVAL_REQUEST || it.toolApproved != null
+                    }
+                    _uiState.update { it.copy(messages = displayMessages, pendingApprovalOptions = emptyMap()) }
                 }
         }
     }
