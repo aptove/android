@@ -25,7 +25,9 @@ class ConnectAgentUseCase @Inject constructor(
     suspend operator fun invoke(qrData: String): Result<Agent> {
         return try {
             val config = json.decodeFromString<ConnectionConfig>(qrData)
-            connectWithConfig(config)
+            // Infer transport from config fields (clientId present → Cloudflare static JSON QR)
+            val transport = if (!config.clientId.isNullOrBlank()) "cloudflare" else "local"
+            connectWithConfig(config, bridgeAgentId = config.agentId, transport = transport)
         } catch (e: Exception) {
             Result.failure(e)
         }

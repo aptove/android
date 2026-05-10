@@ -12,7 +12,9 @@ data class ConnectionConfig(
     val protocol: String = "acp",
     val version: String = "1.0",
     /** The working directory where the bridge was started. */
-    val cwd: String = "/"
+    val cwd: String = "/",
+    /** Stable bridge agent UUID for multi-transport deduplication (present in static JSON QR codes). */
+    val agentId: String? = null
 ) {
     fun toWebSocketUrl(): String {
         return url.replace("https://", "wss://").replace("http://", "ws://")
